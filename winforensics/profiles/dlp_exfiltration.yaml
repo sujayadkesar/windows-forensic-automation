@@ -1,0 +1,91 @@
+id: dlp_exfiltration
+name: Data Exfiltration (DLP alert)
+category: Insider / Data Loss
+icon: dlp
+order: 10
+summary: A user is suspected of taking company files via USB, webmail, cloud or other channels.
+description: >
+  Use when a DLP solution (Purview, Symantec, Forcepoint, Netskope, ...) or a manager reports that an employee
+  copied or uploaded files. Load the corporate laptop and, if available, the personal laptop and the USB device.
+  Every input is optional - the investigation adapts to whatever you know: with a DLP export the alerts are
+  corroborated one by one; with only file names / hashes or reference copies the files are traced everywhere;
+  with nothing but a time window the removable media and web activity in that window is reconstructed.
+when_to_use:
+  - DLP alert of files copied to removable media or uploaded to webmail / cloud
+  - Employee resignation / termination with suspected data theft
+  - Files of a project found outside the company
+evidence_roles:
+  - id: source
+    label: Corporate laptop / workstation (data source)
+    hint: The system the files were taken from
+  - id: personal
+    label: Personal laptop / home PC (possible destination)
+    hint: A device the files may have reached
+  - id: removable
+    label: USB stick / external drive image
+    hint: Image of the removable media itself
+  - id: other
+    label: Other system
+inputs:
+  - id: dlp_exports
+    type: dlp_export
+    label: DLP alert export
+    help: CSV / XLSX / JSON export of the DLP alerts. Columns are mapped automatically (time, activity, user, device, file, hash, USB serial, destination).
+  - id: targets
+    type: target_files
+    label: Files of interest (names / hashes / sizes)
+    help: Type, paste or import a hash list. Any of name, path, size, MD5, SHA-1, SHA-256.
+  - id: reference_files
+    type: reference_files
+    label: Copies of the sensitive files
+    help: The actual files - hashed and compared by content, so modified / re-saved copies are found too.
+  - id: usb_serials
+    type: string_list
+    label: Known USB serial numbers
+  - id: suspect_users
+    type: string_list
+    label: Suspect user account(s)
+  - id: time_window
+    type: time_window
+    label: Period of interest (UTC)
+    help: Leave empty to derive it from the DLP alerts (+/- 24 h).
+  - id: domains
+    type: string_list
+    label: Destinations of concern (domains)
+  - id: keywords
+    type: keywords
+    label: Additional keywords
+    help: Project names, code words, customer names... searched across every byte of the images.
+  - id: background
+    type: text
+    label: Case background
+modules: all
+options:
+  carve: true
+  vss: true
+  raw_scope: full
+analyzers: [system_overview, usb_activity, target_files, removable_access, exfil_channels, dlp_corroboration, cross_device, residual_data,
+            anti_forensics, network_access, case_timeline]
+questions:
+  - id: dlp.usb
+    text: Was removable storage connected to the examined system(s)? When, and by which user?
+  - id: dlp.device_match
+    text: Was the removable device reported in the DLP alert connected to the examined system(s)?
+  - id: dlp.targets_present
+    text: Were the files of interest present on the examined system(s)? Were they deleted, renamed or archived?
+  - id: dlp.removable_access
+    text: Is there evidence that the files were copied to, or opened from, removable media?
+  - id: dlp.web
+    text: Is there evidence that the files were uploaded via webmail, cloud storage or file-sharing websites?
+  - id: dlp.other_channels
+    text: Were other channels used (e-mail, cloud sync client, CD/DVD burning, printing, archiving / transfer tools)?
+  - id: dlp.personal_device
+    text: Did the files reach the personal / secondary device, and how?
+  - id: dlp.alert_corroboration
+    text: Do the system artifacts corroborate each DLP alert?
+  - id: anti_forensics
+    text: Is there evidence of attempts to conceal the activity or remove traces?
+  - id: residual
+    text: Do residual data areas (unallocated space, slack, pagefile, hibernation file) contain traces of the files or activity?
+report:
+  title: Data Exfiltration Investigation Report

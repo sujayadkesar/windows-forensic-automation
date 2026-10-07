@@ -1,0 +1,57 @@
+id: clickfix
+name: ClickFix / Fake CAPTCHA (paste-and-run)
+category: Intrusion / Malware
+icon: clickfix
+order: 21
+summary: User was tricked into pasting a command into Win+R or a terminal. Find the command, the lure and the payload.
+description: >
+  ClickFix / fake-CAPTCHA pages copy a malicious command to the clipboard and instruct the user to press Win+R,
+  Ctrl+V and Enter (or paste into PowerShell). The Run box history keeps the command. This profile recovers the
+  pasted command(s), identifies the lure page visited just before, and reconstructs what the command downloaded,
+  executed and persisted in the following hour (typically an info-stealer or loader).
+when_to_use:
+  - User reports a "verify you are human" page that asked them to run something
+  - EDR alert on mshta / powershell launched from explorer.exe
+  - Info-stealer infection with an unknown entry point
+evidence_roles:
+  - id: source
+    label: Affected system
+inputs:
+  - id: iocs
+    type: iocs
+    label: Known lure URL / domains / IOCs
+  - id: samples
+    type: samples
+    label: Payload sample(s), if recovered
+  - id: time_window
+    type: time_window
+    label: Period of interest (UTC)
+  - id: suspect_users
+    type: string_list
+    label: Affected user account(s)
+  - id: background
+    type: text
+    label: Case background
+modules: all
+options:
+  carve: true
+analyzers: [system_overview, clickfix, malware_hunt, suspicious_activity, account_activity, anti_forensics, residual_data, case_timeline]
+questions:
+  - id: clickfix.command
+    text: Was a command pasted into the Run box or a terminal, and what did it do?
+  - id: clickfix.lure
+    text: Which web page lured the user into running it?
+  - id: clickfix.payload
+    text: What was downloaded, executed or created as a result?
+  - id: persist.found
+    text: Was persistence established?
+  - id: mal.network
+    text: Do the command / payload network indicators appear elsewhere on the system?
+  - id: exec.suspicious
+    text: Is there other suspicious execution on the system?
+  - id: defender
+    text: Did Microsoft Defender detect or block anything?
+  - id: anti_forensics
+    text: Was evidence removed?
+report:
+  title: ClickFix Incident Investigation Report

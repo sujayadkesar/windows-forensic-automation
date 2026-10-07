@@ -1,0 +1,65 @@
+id: usb_activity_review
+name: Removable Media Activity Review
+category: Insider / Data Loss
+icon: usb
+order: 11
+summary: Only know that a USB device was connected? Reconstruct exactly what happened around it.
+description: >
+  Use when there is no DLP alert and no list of files - just the knowledge (or suspicion) that a pen drive or external
+  disk was used. Windows Forensic Automation reconstructs every removable device, each connection session and which user mounted it, then
+  lists the documents and folders that were opened from it, files that were accessed or archived while it was connected,
+  web uploads in the same period and any clean-up activity. Add a USB serial or a time window if you have one.
+when_to_use:
+  - "A pen drive was seen / reported, no further detail"
+  - Audit of removable media use before an employee leaves
+  - Checking whether a found USB stick was used on a company system
+evidence_roles:
+  - id: source
+    label: Workstation / laptop
+  - id: removable
+    label: USB stick / external drive image
+  - id: personal
+    label: Other / personal system
+inputs:
+  - id: usb_serials
+    type: string_list
+    label: USB serial number(s), if known
+  - id: time_window
+    type: time_window
+    label: Period of interest (UTC), if known
+  - id: suspect_users
+    type: string_list
+    label: User account(s) of interest
+  - id: targets
+    type: target_files
+    label: Files of interest (optional)
+  - id: keywords
+    type: keywords
+    label: Keywords (optional)
+  - id: background
+    type: text
+    label: Case background
+modules: all
+options:
+  carve: true
+  vss: true
+analyzers: [system_overview, usb_activity, target_files, removable_access, exfil_channels, cross_device, residual_data, anti_forensics, network_access, case_timeline]
+questions:
+  - id: dlp.usb
+    text: Which removable storage devices were connected, when, and by which user?
+  - id: dlp.device_match
+    text: Was the specific device of interest (serial number) connected?
+  - id: dlp.removable_access
+    text: Which files and folders were opened from, or copied to, the removable media?
+  - id: dlp.targets_present
+    text: Were any files of interest present on the system(s)?
+  - id: dlp.web
+    text: Were files uploaded to web services in the same period?
+  - id: dlp.other_channels
+    text: Were archiving, transfer, cloud sync or printing tools used in the same period?
+  - id: anti_forensics
+    text: Was device history or other evidence removed?
+  - id: residual
+    text: Do unallocated space, slack or memory files hold further traces?
+report:
+  title: Removable Media Activity Report

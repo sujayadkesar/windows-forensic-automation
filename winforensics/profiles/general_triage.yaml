@@ -1,0 +1,72 @@
+id: general_triage
+name: General Triage (everything)
+category: General
+icon: triage
+order: 5
+summary: No specific allegation yet. Run every parser and every analyzer and see what stands out.
+description: >
+  Runs every artifact module, the full physical search and every analyzer: system overview, users and logons,
+  removable media, files accessed, web / e-mail / cloud activity, suspicious execution and persistence, remote
+  access tools, anti-forensics and the consolidated timeline. Use it as the first pass on any new device or when the
+  case background is still unclear. All parsed artifacts are exported for manual review.
+when_to_use:
+  - First look at a seized device
+  - Background unclear - decide the line of enquiry from the results
+evidence_roles:
+  - id: source
+    label: System examined
+  - id: personal
+    label: Second system
+  - id: removable
+    label: Removable media
+  - id: other
+    label: Other
+inputs:
+  - id: keywords
+    type: keywords
+    label: Keywords
+  - id: targets
+    type: target_files
+    label: Files of interest (optional)
+  - id: iocs
+    type: iocs
+    label: IOCs (optional)
+  - id: time_window
+    type: time_window
+    label: Period of interest (UTC)
+  - id: suspect_users
+    type: string_list
+    label: Users of interest
+  - id: background
+    type: text
+    label: Case background
+modules: all
+analyzers: [system_overview, account_activity, usb_activity, removable_access, target_files, exfil_channels, suspicious_activity,
+            malware_hunt, remote_access_review, clickfix, phishing, ransomware, cross_device, anti_forensics, residual_data, network_access, case_timeline]
+questions:
+  - id: acct.logons
+    text: Who used the system and when?
+  - id: dlp.usb
+    text: Which removable devices were connected?
+  - id: dlp.removable_access
+    text: Which files were opened from or copied to removable media?
+  - id: dlp.web
+    text: Which webmail, cloud and file-sharing services were used?
+  - id: exec.suspicious
+    text: Is there suspicious execution?
+  - id: persist.found
+    text: Is there unusual persistence?
+  - id: rmm.tools
+    text: Are remote access tools present / used?
+  - id: clickfix.command
+    text: Were commands pasted into the Run box (ClickFix)?
+  - id: phish.email
+    text: Are there phishing e-mails with risky attachments?
+  - id: ransom.encryption
+    text: Are there signs of ransomware?
+  - id: anti_forensics
+    text: Is there evidence of anti-forensic activity?
+  - id: residual
+    text: Do residual areas contain traces of the keywords / files of interest?
+report:
+  title: Forensic Triage Report

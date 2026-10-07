@@ -1,0 +1,241 @@
+# Suspicious command / script patterns.  Every command line, script block, Run box
+# entry, scheduled task action, service image path and persistence value is scored
+# against this list.  score: 1 (weak) .. 10 (very strong).  Regexes are Python
+# syntax, matched case-insensitively.  Contributions welcome.
+
+commands:
+  - id: ps_encoded
+    regex: '(?:powershell|pwsh)[^\n]*\s-(?:e|ec|en|enc|enco|encod|encode|encoded|encodedc|encodedcommand)\s+[A-Za-z0-9+/=]{16,}'
+    score: 8
+    title: PowerShell encoded command
+    mitre: [T1059.001, T1027]
+  - id: ps_hidden
+    regex: '-w(?:indowstyle)?\s+(?:h|hid|hidden|1)\b'
+    score: 5
+    title: Hidden window
+    mitre: [T1564.003]
+  - id: ps_noprofile_bypass
+    regex: '-(?:ep|exec|executionpolicy)\s+(?:bypass|unrestricted)'
+    score: 4
+    title: Execution policy bypass
+    mitre: [T1059.001]
+  - id: ps_download_cradle
+    regex: '(?:downloadstring|downloadfile|downloaddata|net\.webclient|invoke-webrequest|\biwr\b|invoke-restmethod|\birm\b|start-bitstransfer|wget\s+http|curl(?:\.exe)?\s+[-\w\s]*https?://)'
+    score: 7
+    title: Download cradle / remote content retrieval
+    mitre: [T1105]
+  - id: ps_iex
+    regex: '(?:\biex\b|invoke-expression|\.invoke\(\)|\[scriptblock\]::create)'
+    score: 7
+    title: Dynamic code execution (IEX)
+    mitre: [T1059.001]
+  - id: ps_frombase64
+    regex: 'frombase64string|\[convert\]::frombase64|-join\s*\(\s*\[char'
+    score: 6
+    title: In-line Base64 / char decoding
+    mitre: [T1027, T1140]
+  - id: amsi_bypass
+    regex: 'amsiutils|amsiinitfailed|amsiscanbuffer|amsicontext'
+    score: 9
+    title: AMSI bypass
+    mitre: [T1562.001]
+  - id: defender_tamper
+    regex: '(?:set-mppreference|add-mppreference)[^\n]*(?:disablerealtimemonitoring|exclusionpath|exclusionprocess|exclusionextension|disableioavprotection|disablebehaviormonitoring)|disableantispyware'
+    score: 9
+    title: Microsoft Defender tampering / exclusions
+    mitre: [T1562.001]
+  - id: mshta_remote
+    regex: 'mshta(?:\.exe)?\s+["'']?(?:https?:|vbscript:|javascript:)'
+    score: 9
+    title: MSHTA executing remote / inline script
+    mitre: [T1218.005]
+  - id: mshta_any
+    regex: '\bmshta(?:\.exe)?\b'
+    score: 5
+    title: MSHTA usage
+    mitre: [T1218.005]
+  - id: rundll32_suspicious
+    regex: 'rundll32(?:\.exe)?\s+[^\n]*(?:javascript:|\\\\|https?:|\.(?:dat|tmp|png|jpg|txt|log)\b|,#\d+)'
+    score: 7
+    title: Suspicious rundll32 invocation
+    mitre: [T1218.011]
+  - id: regsvr32_squiblydoo
+    regex: 'regsvr32(?:\.exe)?[^\n]*/i:\s*https?:|scrobj\.dll'
+    score: 9
+    title: Regsvr32 remote scriptlet (Squiblydoo)
+    mitre: [T1218.010]
+  - id: certutil_download
+    regex: 'certutil(?:\.exe)?[^\n]*(?:-urlcache|-verifyctl|-decode|-decodehex)'
+    score: 8
+    title: Certutil download / decode
+    mitre: [T1105, T1140]
+  - id: bitsadmin_transfer
+    regex: 'bitsadmin(?:\.exe)?[^\n]*/(?:transfer|addfile|setnotifycmdline)'
+    score: 7
+    title: BITSAdmin transfer
+    mitre: [T1197]
+  - id: wscript_script
+    regex: '(?:wscript|cscript)(?:\.exe)?[^\n]*\.(?:js|jse|vbs|vbe|wsf|wsh)\b'
+    score: 5
+    title: Windows Script Host script execution
+    mitre: [T1059.005, T1059.007]
+  - id: cmd_chain_download
+    regex: 'cmd(?:\.exe)?\s+/c[^\n]*(?:curl|bitsadmin|certutil|powershell|mshta|ftp|tftp)'
+    score: 6
+    title: cmd.exe launching download/script utility
+    mitre: [T1059.003]
+  - id: finger_abuse
+    regex: '\bfinger(?:\.exe)?\s+\S+@'
+    score: 9
+    title: finger.exe used to fetch payload
+    mitre: [T1105]
+  - id: lolbas_msiexec_remote
+    regex: 'msiexec(?:\.exe)?[^\n]*(?:/i|/q|-i)\s*["'']?https?://'
+    score: 8
+    title: msiexec installing remote package
+    mitre: [T1218.007]
+  - id: shadow_delete
+    regex: 'vssadmin[^\n]*delete\s+shadows|wmic[^\n]*shadowcopy\s+delete|wbadmin[^\n]*delete\s+catalog|bcdedit[^\n]*recoveryenabled\s+no|bcdedit[^\n]*ignoreallfailures|get-wmiobject\s+win32_shadowcopy[^\n]*delete'
+    score: 10
+    title: Shadow copy / recovery inhibition
+    mitre: [T1490]
+  - id: log_clear
+    regex: 'wevtutil(?:\.exe)?\s+(?:cl|clear-log)|clear-eventlog|remove-eventlog'
+    score: 9
+    title: Event log clearing
+    mitre: [T1070.001]
+  - id: usn_delete
+    regex: 'fsutil(?:\.exe)?\s+usn\s+deletejournal'
+    score: 9
+    title: USN journal deletion
+    mitre: [T1070]
+  - id: cipher_wipe
+    regex: 'cipher(?:\.exe)?\s+/w'
+    score: 8
+    title: Free space wipe (cipher /w)
+    mitre: [T1070.004]
+  - id: sdelete
+    regex: '\bsdelete(?:64)?(?:\.exe)?\b'
+    score: 8
+    title: Secure deletion utility
+    mitre: [T1070.004]
+  - id: credential_dump
+    regex: 'sekurlsa|lsadump|mimikatz|procdump[^\n]*lsass|comsvcs(?:\.dll)?[^\n]*minidump|ntdsutil[^\n]*ifm|reg(?:\.exe)?\s+save\s+hklm\\(?:sam|security|system)'
+    score: 10
+    title: Credential dumping
+    mitre: [T1003]
+  - id: user_add
+    regex: 'net1?(?:\.exe)?\s+user\s+\S+\s+\S+\s+/add|net1?(?:\.exe)?\s+localgroup\s+administrators\s+\S+\s+/add'
+    score: 8
+    title: Local account creation / admin group addition
+    mitre: [T1136.001, T1098]
+  - id: schtasks_create
+    regex: 'schtasks(?:\.exe)?\s+/create'
+    score: 5
+    title: Scheduled task creation
+    mitre: [T1053.005]
+  - id: service_create
+    regex: '\bsc(?:\.exe)?\s+(?:\\\\\S+\s+)?create\b|new-service'
+    score: 5
+    title: Service creation
+    mitre: [T1543.003]
+  - id: run_key_add
+    regex: 'reg(?:\.exe)?\s+add\s+[^\n]*\\currentversion\\run|new-itemproperty[^\n]*\\currentversion\\run'
+    score: 7
+    title: Run key persistence via command line
+    mitre: [T1547.001]
+  - id: firewall_change
+    regex: 'netsh(?:\.exe)?\s+(?:advfirewall|firewall)\s+[^\n]*(?:add|set|delete)|new-netfirewallrule|set-netfirewallprofile[^\n]*-enabled\s+false'
+    score: 6
+    title: Firewall modification
+    mitre: [T1562.004]
+  - id: rdp_enable
+    regex: 'fdenytsconnections[^\n]*(?:/d\s+0|0x0|\b0\b)|enable-netfirewallrule[^\n]*remote desktop'
+    score: 7
+    title: RDP enabled from command line
+    mitre: [T1021.001]
+  - id: discovery
+    regex: '\b(?:whoami(?:\.exe)?\s*/(?:all|groups|priv)|nltest(?:\.exe)?\s+/(?:dclist|domain_trusts)|net1?(?:\.exe)?\s+(?:group|localgroup)\s+"?(?:domain admins|administrators)|systeminfo|adfind|dsquery)'
+    score: 3
+    title: Reconnaissance / discovery command
+    mitre: [T1087, T1082, T1016]
+  - id: archive_password
+    regex: '(?:7z|7za|rar|winrar)(?:\.exe)?\s+a\b[^\n]*\s-(?:p|hp)\S*'
+    score: 7
+    title: Password protected archive creation
+    mitre: [T1560.001]
+  - id: archive_create
+    regex: '(?:7z|7za|7zg|rar|winrar|tar)(?:\.exe)?\s+(?:a|-c[a-z]*)\b|compress-archive'
+    score: 4
+    title: Archive creation
+    mitre: [T1560.001]
+  - id: rclone_exfil
+    regex: 'rclone(?:\.exe)?\s+(?:copy|sync|move|copyto)\b'
+    score: 9
+    title: rclone transfer to remote storage
+    mitre: [T1567.002]
+  - id: clipboard_paste_runbox
+    regex: '(?:#|::|rem\s)\s*(?:i\s*a?m\s*not\s*a\s*robot|verif(?:y|ication)|captcha|cloudflare|human|recaptcha|ray\s*id|press\s*enter)'
+    score: 9
+    title: ClickFix lure comment appended to pasted command
+    mitre: [T1204.004]
+  - id: lnk_from_temp
+    regex: '\\(?:appdata\\local\\temp|windows\\temp|users\\public|programdata|appdata\\roaming)\\[^\\\n]+\.(?:exe|dll|scr|bat|cmd|ps1|vbs|js|hta)\b'
+    score: 4
+    title: Execution from user-writable location
+    mitre: [T1204.002]
+  - id: ip_url
+    regex: 'https?://(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?/'
+    score: 5
+    title: URL pointing directly at an IP address
+    mitre: [T1105]
+  - id: suspicious_tld
+    regex: 'https?://[^/\s"'']+\.(?:top|xyz|zip|mov|click|icu|buzz|cfd|sbs|shop|live|lol|quest|rest|cyou|bond|beauty|hair|monster|pw|ru|su|tk|ml|ga|cf|gq)(?:[:/\s"'']|$)'
+    score: 4
+    title: URL on high-abuse TLD
+    mitre: [T1105]
+  - id: paste_or_tunnel
+    regex: 'pastebin\.com|paste\.ee|raw\.githubusercontent\.com|transfer\.sh|ngrok|trycloudflare\.com|discordapp\.com/attachments|telegra\.ph|api\.telegram\.org'
+    score: 6
+    title: Payload hosting / tunnel service
+    mitre: [T1102, T1105]
+  - id: obfuscation_ticks
+    regex: '(?:\w`\w.*){4,}|(?:\^\w){5,}|(?:"\s*\+\s*"){4,}'
+    score: 5
+    title: Command obfuscation (escape chars / concatenation)
+    mitre: [T1027]
+  - id: uac_bypass
+    regex: 'fodhelper|computerdefaults|eventvwr\.exe|sdclt\.exe|ms-settings\\shell\\open\\command|mscfile\\shell\\open\\command'
+    score: 8
+    title: UAC bypass technique
+    mitre: [T1548.002]
+  - id: wmi_exec
+    regex: 'wmic(?:\.exe)?\s+[^\n]*process\s+call\s+create|invoke-wmimethod[^\n]*win32_process|invoke-cimmethod[^\n]*create'
+    score: 6
+    title: WMI process creation
+    mitre: [T1047]
+  - id: remote_exec
+    regex: 'psexec|paexec|winrs(?:\.exe)?\s|invoke-command\s+-computername|enter-pssession'
+    score: 6
+    title: Remote execution tooling
+    mitre: [T1021, T1569.002]
+  - id: ransom_note_words
+    regex: 'your files (?:have been|are) encrypted|decrypt(?:ion)? (?:key|tool)|bitcoin wallet|\.onion\b'
+    score: 8
+    title: Ransomware note language
+    mitre: [T1486]
+
+# Words that make a browser page title / URL look like a fake CAPTCHA (ClickFix lure)
+clickfix_lure_terms: [captcha, "verify you are human", "i'm not a robot", "i am not a robot", "human verification",
+                      "verification step", "press win+r", "windows + r", "press ctrl+v", "cloudflare ray id",
+                      "checking if the site connection is secure", "fix it", "browser update required", "recaptcha"]
+
+# Extensions considered "documents of interest" for DLP style investigations
+document_extensions: [doc, docx, docm, dot, dotx, xls, xlsx, xlsm, xlsb, csv, ppt, pptx, pptm, pdf, txt, rtf, odt, ods, odp,
+                      vsd, vsdx, mpp, msg, eml, pst, ost, one, xml, json, sql, db, sqlite, accdb, mdb, dwg, dxf, step, stp,
+                      zip, 7z, rar, tar, gz, tgz, bz2, xz, iso, kdbx, key, pem, pfx, p12, py, java, cs, cpp, c, h, js, ts, go,
+                      rs, rb, php, ps1, md, log, bak, jpg, jpeg, png, tif, tiff, heic, mp4, mov]
+
+executable_extensions: [exe, dll, scr, com, pif, cpl, msi, msp, msix, appx, sys, ocx, bat, cmd, ps1, psm1, vbs, vbe, js,
+                        jse, wsf, wsh, hta, lnk, url, iso, img, vhd, vhdx, jar, py, chm, reg, xll, wll, iqy, slk, appref-ms,
+                        library-ms, searchconnector-ms, settingcontent-ms, application, xbap]

@@ -1,0 +1,60 @@
+id: phishing
+name: Phishing / Malicious Attachment or Link
+category: Intrusion / Malware
+icon: phishing
+order: 22
+summary: A user received a phishing e-mail. Was it opened, did anything run, were credentials entered?
+description: >
+  Examines mail stores (PST / OST / EML / MSG) for the reported message and risky attachments, files saved from
+  mail or downloaded via its links (Mark-of-the-Web), documents with macros / editing enabled, disk images mounted,
+  Office applications launching interpreters, follow-on execution and persistence, and visits to credential-
+  harvesting pages.
+when_to_use:
+  - User clicked a link or opened an attachment from a suspicious e-mail
+  - Mail gateway alert after delivery
+  - Business e-mail compromise with an unknown initial vector
+evidence_roles:
+  - id: source
+    label: Recipient's system
+inputs:
+  - id: iocs
+    type: iocs
+    label: Sender address, subject, URLs, attachment hashes / names
+  - id: samples
+    type: samples
+    label: The attachment / downloaded file, if available
+  - id: time_window
+    type: time_window
+    label: Period of interest (UTC)
+  - id: suspect_users
+    type: string_list
+    label: Recipient account(s)
+  - id: keywords
+    type: keywords
+    label: Keywords (subject words, lure terms)
+  - id: background
+    type: text
+    label: Case background
+modules: all
+analyzers: [system_overview, phishing, malware_hunt, suspicious_activity, account_activity, anti_forensics, residual_data, case_timeline]
+questions:
+  - id: phish.email
+    text: Is the phishing e-mail (or a message with a risky attachment) present in the mail stores?
+  - id: phish.opened
+    text: Was the attachment / link opened, active content enabled or a disk image mounted?
+  - id: phish.executed
+    text: Did an Office or PDF application start a command interpreter or other suspicious process?
+  - id: mal.present
+    text: Is the attachment / payload present on the system?
+  - id: mal.executed
+    text: Was the payload executed?
+  - id: persist.found
+    text: Was persistence established?
+  - id: phish.credentials
+    text: Were credential-harvesting pages visited?
+  - id: exec.suspicious
+    text: Is there other suspicious execution?
+  - id: anti_forensics
+    text: Was evidence removed?
+report:
+  title: Phishing Incident Investigation Report

@@ -1,0 +1,22 @@
+{
+ "test_doc_alpha.docx": {
+  "sha256": "d0d02d44ee19e19f1c56e955ddd5fd2ea13fbff845763141b69baf1dce67689a",
+  "md5": "4cea4ac68e8e514003b27edf5170c5ea",
+  "size": 36695
+ },
+ "test_sheet_beta.xlsx": {
+  "sha256": "f17e330aba41005f171629b0daac5f8c7d105df2a6f5353244b4102f622ce627",
+  "md5": "36d2ead46ba164ee34631df29da25cf0",
+  "size": 4912
+ },
+ "test_report_gamma.pdf": {
+  "sha256": "d459780e047b61419e2397b86acd48b10f96fbf00766ae2290b639eef9669a47",
+  "md5": "4d89a28cd311863ff1f759b4c3f92946",
+  "size": 766
+ },
+ "test_list_delta.csv": {
+  "sha256": "df3c0a758c3dca15a5b9bb0a99a5f6e5dd24aac52f52f838e52a9ad1ab5bb092",
+  "md5": "854f26fbaf4d8202cfa5c7e2d372b4b3",
+  "size": 1394
+ }
+}

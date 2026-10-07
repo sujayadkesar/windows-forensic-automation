@@ -1,0 +1,146 @@
+# Destination knowledge base used to classify URLs/hosts found in browser history,
+# downloads, pagefile strings, event logs and DLP alerts.
+#
+# Each category maps a service name to a list of host suffixes (matched against the
+# end of the host name) or host+path prefixes ("host/path"). Contributions welcome -
+# keep entries lowercase.
+
+webmail:
+  Gmail: [mail.google.com, gmail.com, inbox.google.com]
+  Outlook.com / Hotmail: [outlook.live.com, mail.live.com, hotmail.com, outlook.com/mail]
+  Outlook on the web (M365): [outlook.office.com, outlook.office365.com, outlook.cloud.microsoft]
+  Yahoo Mail: [mail.yahoo.com, mail.yahoo.co.in, mail.yahoo.co.uk]
+  Proton Mail: [mail.proton.me, mail.protonmail.com, protonmail.com, proton.me/mail]
+  Zoho Mail: [mail.zoho.com, mail.zoho.in, mail.zoho.eu]
+  AOL Mail: [mail.aol.com]
+  GMX: [gmx.com, gmx.net, gmx.de, navigator.gmx.net]
+  Yandex Mail: [mail.yandex.com, mail.yandex.ru]
+  Tuta (Tutanota): [tutanota.com, tuta.com, app.tuta.com, mail.tutanota.com]
+  iCloud Mail: [icloud.com/mail, www.icloud.com/mail]
+  Fastmail: [fastmail.com, app.fastmail.com]
+  Mail.com: [mail.com]
+  Rediffmail: [mail.rediff.com, rediffmail.com]
+
+mail_attachment:
+  Gmail attachment: [mail-attachment.googleusercontent.com, "mail.google.com/mail/u/0/?ui=2&ik="]
+  Outlook attachment: [attachments.office.net, outlook.live.com/owa/service.svc/s/getfileattachment]
+  Yahoo attachment: [apis.mail.yahoo.com]
+
+cloud_storage:
+  Google Drive: [drive.google.com, docs.google.com, drive.usercontent.google.com, doc-0, clients6.google.com/upload]
+  OneDrive (personal): [onedrive.live.com, 1drv.ms, 1drv.com, storage.live.com, d.docs.live.net]
+  SharePoint / OneDrive for Business: [sharepoint.com]
+  Dropbox: [dropbox.com, dl.dropboxusercontent.com, dropboxusercontent.com, db.tt]
+  Box: [box.com, app.box.com, box.net]
+  MEGA: [mega.nz, mega.io, mega.co.nz]
+  iCloud Drive: [icloud.com/iclouddrive, www.icloud.com/iclouddrive]
+  pCloud: [pcloud.com, my.pcloud.com, e.pcloud.link]
+  Sync.com: [sync.com, cp.sync.com]
+  MediaFire: [mediafire.com]
+  4shared: [4shared.com]
+  Yandex Disk: [disk.yandex.com, disk.yandex.ru]
+  TeraBox: [terabox.com, 1024terabox.com]
+  Degoo: [degoo.com, app.degoo.com]
+  Koofr: [koofr.net, app.koofr.net]
+  IDrive: [idrive.com]
+  Tresorit: [tresorit.com, web.tresorit.com]
+  Amazon Drive / S3: [amazondrive.com, s3.amazonaws.com]
+  Backblaze: [backblaze.com, backblazeb2.com]
+  Jottacloud: [jottacloud.com]
+  Icedrive: [icedrive.net]
+  Nextcloud (hosted): [nextcloud.com]
+
+file_transfer:
+  WeTransfer: [wetransfer.com, we.tl]
+  Smash: [fromsmash.com]
+  SwissTransfer: [swisstransfer.com]
+  TransferNow: [transfernow.net]
+  Filemail: [filemail.com]
+  Send Anywhere: [send-anywhere.com, sendanywhere.com]
+  file.io: [file.io]
+  Gofile: [gofile.io]
+  transfer.sh: [transfer.sh]
+  temp.sh: [temp.sh]
+  Catbox: [catbox.moe, litterbox.catbox.moe]
+  Pixeldrain: [pixeldrain.com]
+  KrakenFiles: [krakenfiles.com]
+  Files.fm: [files.fm]
+  Wormhole: [wormhole.app]
+  Sendspace: [sendspace.com]
+  Uploadfiles: [ufile.io, uploadfiles.io]
+  Filebin: [filebin.net]
+  AnonFiles (and clones): [anonfiles.com, bayfiles.com, anonymfile.com]
+  DropMeFiles: [dropmefiles.com]
+  Easyupload: [easyupload.io]
+  Jumpshare: [jumpshare.com]
+
+paste_site:
+  Pastebin: [pastebin.com]
+  Paste.ee: [paste.ee]
+  Hastebin: [hastebin.com, toptal.com/developers/hastebin]
+  PrivateBin: [privatebin.net]
+  ControlC: [controlc.com]
+  Rentry: [rentry.co, rentry.org]
+  JustPaste.it: [justpaste.it]
+  dpaste: [dpaste.org, dpaste.com]
+  Ghostbin: [ghostbin.com, ghostbin.co]
+
+messaging:
+  WhatsApp Web: [web.whatsapp.com]
+  Telegram Web: [web.telegram.org]
+  Discord: [discord.com, discordapp.com, cdn.discordapp.com, media.discordapp.net]
+  Slack: [slack.com, files.slack.com]
+  Microsoft Teams: [teams.microsoft.com, teams.live.com]
+  Facebook Messenger: [messenger.com, facebook.com/messages]
+  Signal: [signal.org]
+  Skype: [web.skype.com]
+
+code_hosting:
+  GitHub: [github.com, gist.github.com, raw.githubusercontent.com, objects.githubusercontent.com]
+  GitLab: [gitlab.com]
+  Bitbucket: [bitbucket.org]
+
+ai_assistant:
+  ChatGPT: [chat.openai.com, chatgpt.com]
+  Google Gemini: [gemini.google.com, bard.google.com, aistudio.google.com]
+  Claude: [claude.ai]
+  Microsoft Copilot: [copilot.microsoft.com, copilot.cloud.microsoft]
+  Perplexity: [perplexity.ai]
+  Poe: [poe.com]
+  DeepSeek: [chat.deepseek.com, deepseek.com]
+  Mistral Le Chat: [chat.mistral.ai]
+
+job_search:
+  LinkedIn Jobs: [linkedin.com/jobs]
+  Naukri: [naukri.com]
+  Indeed: [indeed.com, in.indeed.com]
+  Glassdoor: [glassdoor.com, glassdoor.co.in]
+  Monster: [monster.com, foundit.in]
+  Shine: [shine.com]
+
+remote_access:
+  AnyDesk: [anydesk.com, net.anydesk.com, boot.net.anydesk.com]
+  TeamViewer: [teamviewer.com, teamviewer.cn]
+  ScreenConnect / ConnectWise: [screenconnect.com, connectwise.com, hostedrmm.com, itsupport247.net]
+  Splashtop: [splashtop.com, api.splashtop.com]
+  Atera: [atera.com, app.atera.com, atera-agent-heartbeat]
+  RustDesk: [rustdesk.com]
+  Zoho Assist: [assist.zoho.com, zoho.com/assist]
+  LogMeIn / GoTo: [logmein.com, goto.com, gotoassist.com, logme.in]
+  Remote Utilities: [remoteutilities.com]
+  Getscreen: [getscreen.me]
+  NinjaOne: [ninjarmm.com, ninjaone.com]
+  Kaseya: [kaseya.com, kaseya.net]
+  Action1: [action1.com]
+  Level: [level.io]
+  SimpleHelp: [simple-help.com]
+  MeshCentral: [meshcentral.com]
+  Chrome Remote Desktop: [remotedesktop.google.com]
+  Quick Assist: [quickassist.microsoft.com, remoteassistance.support.services.microsoft.com]
+  ngrok tunnel: [ngrok.io, ngrok.app, ngrok-free.app]
+  Cloudflare tunnel: [trycloudflare.com]
+
+anti_forensics:
+  Privacy cleaners: [ccleaner.com, bleachbit.org, privazer.com, wisecleaner.com]
+  USB history removal: [usboblivion, nirsoft.net/utils/usb_devices_view]
+  Secure delete: [eraser.heidi.ie, sysinternals.com/sdelete, learn.microsoft.com/en-us/sysinternals/downloads/sdelete]

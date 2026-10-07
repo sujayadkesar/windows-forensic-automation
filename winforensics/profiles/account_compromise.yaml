@@ -1,0 +1,47 @@
+id: account_compromise
+name: Unauthorized Access / Account Compromise
+category: Insider / Access
+icon: account
+order: 25
+summary: Someone used an account they should not have. Reconstruct logons, sources, changes and actions.
+description: >
+  Summarizes every logon by account and type, finds password-guessing bursts, network and RDP logons with source
+  addresses, explicit credential use, account creation and privileged group changes, and what was executed and
+  accessed during the sessions.
+when_to_use:
+  - Account used outside working hours or from an unknown location
+  - Suspected credential theft / password guessing
+  - Lateral movement investigation on one host
+evidence_roles:
+  - id: source
+    label: System examined
+inputs:
+  - id: suspect_users
+    type: string_list
+    label: Account(s) of interest
+  - id: iocs
+    type: iocs
+    label: Source IP addresses / host names
+  - id: time_window
+    type: time_window
+    label: Period of interest (UTC)
+  - id: background
+    type: text
+    label: Case background
+modules: all
+analyzers: [system_overview, account_activity, remote_access_review, suspicious_activity, anti_forensics, network_access, case_timeline]
+questions:
+  - id: acct.logons
+    text: Which accounts logged on, how and when?
+  - id: acct.bruteforce
+    text: Is there evidence of password guessing?
+  - id: rmm.connections
+    text: Which remote sessions took place and from where?
+  - id: acct.changes
+    text: Were accounts created, enabled or added to privileged groups?
+  - id: exec.suspicious
+    text: What suspicious commands or programs were run?
+  - id: anti_forensics
+    text: Were logs cleared or evidence removed?
+report:
+  title: Unauthorized Access Investigation Report

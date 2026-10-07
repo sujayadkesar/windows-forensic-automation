@@ -1,0 +1,29 @@
+# --- evidence access
+dissect.target==3.25.1
+libewf-python==20260924
+libvshadow-python==20260714
+libpff-python==20260926
+pytsk3==20260715
+pycdlib==1.21.0
+# --- artefact parsing
+evtx==0.13.1
+LnkParse3==1.6.0
+olefile==0.47
+oletools==0.60.2
+msoffcrypto-tool==6.0.0
+pypdf==6.19.0
+pefile==2024.8.26
+cryptography==50.0.2
+python-dateutil==2.9.0.post0
+PyYAML==6.0.3
+# --- search / malware
+pyahocorasick==2.3.1
+yara-python==4.5.4
+# --- GUI and reporting
+PySide6==6.11.2
+python-docx==1.2.0
+xlsxwriter==3.2.9
+openpyxl==3.1.5
+pywin32==312
+# --- build
+pyinstaller==6.22.3

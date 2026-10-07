@@ -1,0 +1,14 @@
+name: Artifact or case type request
+description: Ask for a new artifact parser, analyzer or investigation profile
+labels: [enhancement]
+body:
+  - type: input
+    id: artifact
+    attributes: {label: Artifact / case type}
+    validations: {required: true}
+  - type: textarea
+    id: why
+    attributes: {label: Why it matters for investigations, description: "Which questions does it answer? Link to research or documentation if possible."}
+  - type: textarea
+    id: data
+    attributes: {label: Test data, description: "Public images or a way to create synthetic data (never real case data)"}

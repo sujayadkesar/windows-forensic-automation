@@ -1,0 +1,6 @@
+Activity,Happened (UTC),User,Device name,File name,File path,File size,SHA256,Removable media serial,Target domain,Policy
+FileCopiedToRemovableMedia,2026-09-14T05:35:00Z,testuser,WKSTN-TEST-01,test_doc_alpha.docx,C:\Users\testuser\Documents\Project\test_doc_alpha.docx,36695,d0d02d44ee19e19f1c56e955ddd5fd2ea13fbff845763141b69baf1dce67689a,TESTSN000000000001,,Test Policy
+FileCopiedToRemovableMedia,2026-09-14T05:36:00Z,testuser,WKSTN-TEST-01,test_sheet_beta.xlsx,C:\Users\testuser\Documents\Project\test_sheet_beta.xlsx,4912,f17e330aba41005f171629b0daac5f8c7d105df2a6f5353244b4102f622ce627,TESTSN000000000001,,Test Policy
+FileCopiedToRemovableMedia,2026-09-14T05:37:00Z,testuser,WKSTN-TEST-01,test_report_gamma.pdf,C:\Users\testuser\Documents\Project\test_report_gamma.pdf,766,d459780e047b61419e2397b86acd48b10f96fbf00766ae2290b639eef9669a47,TESTSN000000000001,,Test Policy
+FileCopiedToRemovableMedia,2026-09-14T05:38:00Z,testuser,WKSTN-TEST-01,test_list_delta.csv,C:\Users\testuser\Documents\Project\test_list_delta.csv,1394,df3c0a758c3dca15a5b9bb0a99a5f6e5dd24aac52f52f838e52a9ad1ab5bb092,TESTSN000000000001,,Test Policy
+FileUploadedToCloud,2026-09-14T06:12:00Z,testuser,WKSTN-TEST-01,test_doc_alpha.docx,C:\Users\testuser\Documents\Project\test_doc_alpha.docx,36695,d0d02d44ee19e19f1c56e955ddd5fd2ea13fbff845763141b69baf1dce67689a,,mail.google.com,Test Policy

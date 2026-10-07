@@ -1,0 +1,200 @@
+# Tool knowledge base: executables, install paths, services and log locations for
+# tool families that matter in investigations.  Matching is case-insensitive.
+#   exe:      executable file names (used against prefetch, amcache, shimcache, BAM, 4688, Sysmon...)
+#   paths:    path fragments (installed location / artifact location)
+#   services: service names
+#   logs:     glob patterns (relative to the system drive) of tool logs worth collecting
+# Contributions welcome - add a new entry and every module/analyzer picks it up.
+
+remote_access:
+  AnyDesk:
+    exe: [anydesk.exe]
+    paths: ["\\anydesk\\", "\\programdata\\anydesk"]
+    services: [anydesk]
+    logs: ["ProgramData/AnyDesk/ad_svc.trace", "ProgramData/AnyDesk/connection_trace.txt", "Users/*/AppData/Roaming/AnyDesk/ad.trace",
+           "Users/*/AppData/Roaming/AnyDesk/connection_trace.txt", "Users/*/AppData/Roaming/AnyDesk/user.conf", "ProgramData/AnyDesk/system.conf"]
+  TeamViewer:
+    exe: [teamviewer.exe, teamviewer_service.exe, tv_w32.exe, tv_x64.exe, teamviewerqs.exe]
+    paths: ["\\teamviewer\\"]
+    services: [teamviewer]
+    logs: ["Program Files/TeamViewer/Connections_incoming.txt", "Program Files (x86)/TeamViewer/Connections_incoming.txt",
+           "Program Files/TeamViewer/TeamViewer*_Logfile*.log", "Program Files (x86)/TeamViewer/TeamViewer*_Logfile*.log",
+           "Users/*/AppData/Roaming/TeamViewer/Connections.txt", "Users/*/AppData/Local/Temp/TeamViewer/*.log"]
+  ScreenConnect / ConnectWise Control:
+    names: ["screenconnect", "connectwise control"]
+    exe: [screenconnect.clientservice.exe, screenconnect.windowsclient.exe, screenconnect.windowsbackstageshell.exe, connectwisecontrol.client.exe]
+    paths: ["\\screenconnect client", "\\connectwise control client"]
+    services: ["screenconnect client"]
+    logs: ["ProgramData/ScreenConnect Client*/user.config", "Program Files (x86)/ScreenConnect Client*/system.config"]
+  Splashtop:
+    exe: [srservice.exe, srmanager.exe, strwinclt.exe, srfeature.exe, sragent.exe]
+    paths: ["\\splashtop\\"]
+    services: [splashtopremoteservice]
+    logs: ["ProgramData/Splashtop/Temp/log/*.log", "Program Files (x86)/Splashtop/Splashtop Remote/Server/log/*.txt"]
+  Atera:
+    exe: [ateraagent.exe, agentpackagemonitoring.exe, agentpackagerunCommandinteractive.exe]
+    paths: ["\\atera networks\\", "\\ateraagent\\"]
+    services: [ateraagent]
+    logs: []
+  RustDesk:
+    exe: [rustdesk.exe]
+    paths: ["\\rustdesk\\"]
+    services: [rustdesk]
+    logs: ["Users/*/AppData/Roaming/RustDesk/log/*.log", "Windows/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/server/*.log"]
+  Zoho Assist:
+    names: ["zoho assist"]
+    exe: [zohours.exe, zaservice.exe, zohomeeting.exe, za_connect.exe]
+    paths: ["\\zohomeeting\\", "\\zoho assist"]
+    services: [zohoassist]
+    logs: []
+  LogMeIn / GoTo:
+    names: ["logmein", "goto resolve", "gotoassist", "goto opener"]
+    exe: [logmein.exe, lmiguardiansvc.exe, g2ax_comm_expert.exe, gotoassist.exe, logmeinrescue.exe, gotoresolve.exe]
+    paths: ["\\logmein\\", "\\gotoassist", "\\goto resolve"]
+    services: [logmein]
+    logs: []
+  Remote Utilities:
+    exe: [rutserv.exe, rfusclient.exe]
+    paths: ["\\remote utilities"]
+    services: [rmanservice]
+    logs: []
+  NetSupport Manager:
+    names: ["netsupport"]
+    exe: [client32.exe, pcicfgui.exe, nsm.exe]
+    paths: ["\\netsupport\\"]
+    services: [client32]
+    logs: []
+  NinjaOne:
+    names: ["ninjarmm", "ninjaone"]
+    exe: [ninjarmmagent.exe, ninjarmmagentpatcher.exe]
+    paths: ["\\ninjarmmagent", "\\ninjarmm"]
+    services: [ninjarmmagent]
+    logs: []
+  Kaseya VSA:
+    names: ["kaseya"]
+    exe: [agentmon.exe, kaseyaremotecontrolhost.exe]
+    paths: ["\\kaseya\\"]
+    services: [kaseya agent]
+    logs: []
+  Action1:
+    exe: [action1_agent.exe, action1_remote.exe]
+    paths: ["\\action1\\"]
+    services: [a1agent]
+    logs: []
+  SimpleHelp:
+    exe: [remote access.exe, simplegatewayservice.exe, simplehelp.exe]
+    paths: ["\\jwrapper-remote access", "\\simplehelp"]
+    services: [simplehelp]
+    logs: []
+  MeshCentral:
+    names: ["mesh agent", "meshcentral"]
+    exe: [meshagent.exe]
+    paths: ["\\mesh agent\\"]
+    services: ["mesh agent"]
+    logs: []
+  Tactical RMM:
+    names: ["tactical rmm", "tacticalagent"]
+    exe: [tacticalrmm.exe]
+    paths: ["\\tacticalagent\\"]
+    services: [tacticalrmm]
+    logs: []
+  Getscreen:
+    exe: [getscreen.exe]
+    paths: ["\\getscreen"]
+    services: [getscreen]
+    logs: []
+  Chrome Remote Desktop:
+    names: ["chrome remote desktop"]
+    exe: [remoting_host.exe, remoting_desktop.exe]
+    paths: ["\\chrome remote desktop\\"]
+    services: [chromoting]
+    logs: []
+  Quick Assist:
+    exe: [quickassist.exe]
+    paths: ["\\quickassist"]
+    services: []
+    logs: []
+  Ammyy Admin:
+    exe: [aa_v3.exe, ammyy_admin.exe]
+    paths: ["\\ammyy"]
+    services: []
+    logs: []
+  UltraVNC / TightVNC / RealVNC:
+    names: ["ultravnc", "tightvnc", "realvnc", "vnc server", "tigervnc"]
+    exe: [winvnc.exe, tvnserver.exe, vncserver.exe, vncviewer.exe, tvnviewer.exe]
+    paths: ["\\ultravnc", "\\tightvnc", "\\realvnc"]
+    services: [uvnc_service, tvnserver, vncserver]
+    logs: ["Program Files/uvnc bvba/UltraVNC/WinVNC.log"]
+  ngrok:
+    exe: [ngrok.exe]
+    paths: ["\\ngrok"]
+    services: []
+    logs: []
+  Radmin:
+    exe: [radmin.exe, rserver3.exe]
+    paths: ["\\radmin"]
+    services: [rserver3]
+    logs: []
+
+archivers:
+  7-Zip: {exe: [7z.exe, 7zg.exe, 7zfm.exe, 7za.exe, 7zr.exe]}
+  WinRAR: {exe: [winrar.exe, rar.exe, unrar.exe]}
+  WinZip: {exe: [winzip64.exe, winzip32.exe, wzzip.exe]}
+  PeaZip: {exe: [peazip.exe, pea.exe]}
+  Bandizip: {exe: [bandizip.exe, bz.exe]}
+  tar: {exe: [tar.exe]}
+  Compress-Archive (PowerShell): {exe: []}
+
+transfer_tools:
+  rclone: {exe: [rclone.exe]}
+  MEGAsync / MEGAcmd: {exe: [megasync.exe, megacmd.exe, megacmdserver.exe, mega-put.exe]}
+  WinSCP: {exe: [winscp.exe]}
+  FileZilla: {exe: [filezilla.exe, fzsftp.exe]}
+  PuTTY SCP/SFTP: {exe: [pscp.exe, psftp.exe]}
+  curl / wget: {exe: [curl.exe, wget.exe]}
+  FTP client: {exe: [ftp.exe]}
+  Robocopy / Xcopy: {exe: [robocopy.exe, xcopy.exe]}
+  TeraCopy: {exe: [teracopy.exe]}
+  FastCopy: {exe: [fastcopy.exe]}
+  Restic: {exe: [restic.exe]}
+  BITSAdmin: {exe: [bitsadmin.exe]}
+  Google Drive for desktop: {exe: [googledrivefs.exe]}
+  Google Drive / Backup and Sync (legacy client): {exe: [googledrivesync.exe]}
+  Dropbox client: {exe: [dropbox.exe]}
+  OneDrive client: {exe: [onedrive.exe]}
+  Box Drive: {exe: [box.exe, boxui.exe]}
+  pCloud Drive: {exe: [pcloud.exe]}
+  Telegram Desktop: {exe: [telegram.exe]}
+  WhatsApp Desktop: {exe: [whatsapp.exe]}
+  Bluetooth file transfer: {exe: [fsquirt.exe]}
+  ShareX: {exe: [sharex.exe]}
+  AnyDesk file transfer: {exe: []}
+  Nearby Share: {exe: [nearbyshare.exe]}
+
+anti_forensics:
+  CCleaner: {exe: [ccleaner.exe, ccleaner64.exe]}
+  BleachBit: {exe: [bleachbit.exe, bleachbit_console.exe]}
+  Eraser: {exe: [eraser.exe]}
+  SDelete: {exe: [sdelete.exe, sdelete64.exe]}
+  PrivaZer: {exe: [privazer.exe]}
+  USBOblivion: {exe: [usboblivion.exe, usboblivion32.exe, usboblivion64.exe]}
+  USBDeview: {exe: [usbdeview.exe]}
+  Wise Disk / Registry Cleaner: {exe: [wisediskcleaner.exe, wiseregcleaner.exe, wisecare365.exe]}
+  Glary Utilities: {exe: [integrator.exe, glaryutilities.exe]}
+  Timestomp tools: {exe: [timestomp.exe, setmace.exe, nTimestomp.exe, ntimestomp_v1.2_x64.exe, bulkfilechanger.exe, newfiletime.exe]}
+  Cipher wipe: {exe: [cipher.exe]}
+  VeraCrypt / TrueCrypt: {exe: [veracrypt.exe, truecrypt.exe, veracrypt-x64.exe]}
+  Event log clearing (wevtutil): {exe: [wevtutil.exe]}
+  File shredders: {exe: [fileshredder.exe, freeraser.exe, hardwipe.exe]}
+  Disk wipers: {exe: [dban.exe, killdisk.exe, diskwipe.exe]}
+
+lolbins: [powershell.exe, pwsh.exe, cmd.exe, mshta.exe, rundll32.exe, regsvr32.exe, wscript.exe, cscript.exe, certutil.exe,
+          bitsadmin.exe, msiexec.exe, installutil.exe, regasm.exe, regsvcs.exe, msbuild.exe, cmstp.exe, wmic.exe, forfiles.exe,
+          hh.exe, odbcconf.exe, pcalua.exe, scriptrunner.exe, syncappvpublishingserver.exe, msxsl.exe, ieexec.exe, mavinject.exe,
+          finger.exe, curl.exe, tar.exe, expand.exe, extrac32.exe, replace.exe, esentutl.exe, conhost.exe, schtasks.exe, at.exe,
+          sc.exe, reg.exe, net.exe, net1.exe, nltest.exe, whoami.exe, vssadmin.exe, wbadmin.exe, bcdedit.exe, ntdsutil.exe,
+          diskshadow.exe, msdt.exe, control.exe, explorer.exe, cmdl32.exe, presentationhost.exe, ftp.exe, appinstaller.exe]
+
+discovery_commands: [whoami, "net user", "net group", "net localgroup", nltest, "ipconfig /all", systeminfo, tasklist,
+                     "quser", "query user", "net view", arp -a, "route print", netstat, "wmic qfe", "Get-ADUser", "Get-ADComputer",
+                     "dsquery", "AdFind", "nslookup", "net share", "cmdkey /list", "klist"]

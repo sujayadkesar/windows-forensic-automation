@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build output
+build/
+dist/
+packaging/build/
+*.spec.bak
+
+# Synthetic test images are generated locally (python tests/fixtures/build_all.py) - too large for git
+test_data/evidence/
+test_data/staging/
+
+# Never commit case data or evidence
+*.E01
+*.E0[2-9]
+*.Ex01
+*.dd
+*.raw
+*.vmdk
+*.vhd
+*.vhdx
+*.aff4
+case.db
+case.db-wal
+case.db-shm
+Forensic Cases/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.log

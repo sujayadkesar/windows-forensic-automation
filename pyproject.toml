@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "windows-forensic-automation"
+dynamic = ["version"]
+description = "Automated, profile-driven Windows forensic examination: load an image, pick a case type, get a court-ready report."
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+requires-python = ">=3.10"
+authors = [{ name = "Windows Forensic Automation contributors" }]
+keywords = ["dfir", "digital-forensics", "incident-response", "windows", "e01", "forensic-report", "dlp", "malware-analysis"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Legal Industry",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+    "Topic :: System :: Recovery Tools",
+]
+dependencies = [
+    "dissect.target>=3.25", "libewf-python", "libvshadow-python", "libpff-python", "pytsk3", "pycdlib",
+    "evtx", "LnkParse3", "olefile", "oletools", "msoffcrypto-tool", "pypdf", "pefile", "cryptography",
+    "python-dateutil", "PyYAML", "pyahocorasick", "yara-python", "PySide6>=6.6", "python-docx", "xlsxwriter",
+    "openpyxl", "pywin32; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pyflakes", "pyinstaller"]
+
+[project.scripts]
+wfa = "winforensics.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/sujayadkesar/windows-forensic-automation"
+Issues = "https://github.com/sujayadkesar/windows-forensic-automation/issues"
+
+[tool.setuptools.dynamic]
+version = { attr = "winforensics.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["winforensics*"]
+
+[tool.setuptools.package-data]
+winforensics = ["profiles/*.yaml", "knowledge/*.yaml", "knowledge/yara/*.yar"]

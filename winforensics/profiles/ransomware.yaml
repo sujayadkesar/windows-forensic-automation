@@ -1,0 +1,55 @@
+id: ransomware
+name: Ransomware
+category: Intrusion / Malware
+icon: ransomware
+order: 24
+summary: Files were encrypted. Establish when, by what, how the attacker got in and whether data was stolen first.
+description: >
+  Detects the encryption window from the USN journal and file system (bulk extension changes, ransom notes in many
+  folders), shadow copy / backup deletion, the programs, logons and remote sessions that preceded encryption,
+  persistence and lateral movement, and data staging / exfiltration tools (rclone, MEGA, archivers) used before.
+when_to_use:
+  - Encrypted files and ransom notes found
+  - Suspected pre-encryption intrusion (staging)
+evidence_roles:
+  - id: source
+    label: Affected system
+  - id: other
+    label: Other affected system
+inputs:
+  - id: samples
+    type: samples
+    label: Ransom note / encryptor sample (optional)
+  - id: iocs
+    type: iocs
+    label: IOCs (extension, note name, IPs, domains)
+  - id: time_window
+    type: time_window
+    label: Period of interest (UTC)
+  - id: background
+    type: text
+    label: Case background
+modules: all
+options:
+  vss: true
+analyzers: [system_overview, ransomware, remote_access_review, account_activity, suspicious_activity, malware_hunt, exfil_channels,
+            anti_forensics, residual_data, case_timeline]
+questions:
+  - id: ransom.encryption
+    text: Were files encrypted - when, with which extension, and are ransom notes present?
+  - id: ransom.precursor
+    text: What happened in the hours before encryption?
+  - id: rmm.connections
+    text: How did the attacker access the system (RDP, remote tools, network logons)?
+  - id: acct.changes
+    text: Were accounts created or modified?
+  - id: exec.suspicious
+    text: Which tools and commands did the attacker run?
+  - id: persist.found
+    text: Was persistence established?
+  - id: dlp.other_channels
+    text: Was data staged or exfiltrated before encryption (archivers, rclone, cloud tools)?
+  - id: anti_forensics
+    text: Were shadow copies, logs or other evidence destroyed?
+report:
+  title: Ransomware Investigation Report

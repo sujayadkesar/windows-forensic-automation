@@ -1,0 +1,52 @@
+id: remote_access
+name: Remote Access / RMM Abuse
+category: Intrusion / Malware
+icon: rmm
+order: 23
+summary: AnyDesk, TeamViewer, ScreenConnect or RDP used by an attacker or a tech-support scammer.
+description: >
+  Identifies every remote control / RMM tool on the system (files, installs, services, execution), parses their
+  connection logs (AnyDesk, TeamViewer, ScreenConnect, RustDesk, Splashtop...), RDP and network logons with source
+  addresses, account changes, what the operator executed and which files were accessed while connected.
+when_to_use:
+  - Tech-support / refund scam victim
+  - Unexpected AnyDesk / TeamViewer / ScreenConnect installation
+  - Initial access through exposed RDP or an RMM agent
+evidence_roles:
+  - id: source
+    label: Accessed system
+inputs:
+  - id: iocs
+    type: iocs
+    label: Remote IDs, IP addresses, domains
+  - id: time_window
+    type: time_window
+    label: Period of interest (UTC)
+  - id: suspect_users
+    type: string_list
+    label: Account(s) involved
+  - id: background
+    type: text
+    label: Case background
+modules: all
+analyzers: [system_overview, remote_access_review, account_activity, suspicious_activity, malware_hunt, exfil_channels, anti_forensics,
+            residual_data, case_timeline]
+questions:
+  - id: rmm.tools
+    text: Which remote access tools are present, when were they installed and were they run?
+  - id: rmm.connections
+    text: Which remote sessions took place, when and from where?
+  - id: acct.logons
+    text: Which accounts logged on and how?
+  - id: acct.changes
+    text: Were accounts created or added to privileged groups?
+  - id: exec.suspicious
+    text: What did the operator execute?
+  - id: persist.found
+    text: Was persistence left behind?
+  - id: dlp.web
+    text: Were files or data sent out (web, cloud, transfer tools)?
+  - id: anti_forensics
+    text: Were traces removed?
+report:
+  title: Remote Access Investigation Report
