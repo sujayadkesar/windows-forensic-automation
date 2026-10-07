@@ -228,6 +228,9 @@ class PersistenceModule(ArtifactModule):
         """Event consumers bound to a filter (__FilterToConsumerBinding) - the WMI persistence mechanism - parsed from the CIM
         repository.  Class definitions present on every system are not reported."""
         n = ignored = 0
+        if not ctx.exists("C:/Windows/System32/wbem/Repository/OBJECTS.DATA"):
+            ctx.coverage("WMI subscriptions", "wbem\\Repository (CIM)", "absent", 0, "no WMI repository on this system")
+            return
         try:
             for r in ctx.plugin("cim.consumerbindings"):
                 script = r.get("script_text") or r.get("script_file_name")
@@ -249,6 +252,9 @@ class PersistenceModule(ArtifactModule):
                     source="C:\\Windows\\System32\\wbem\\Repository", tags=["suspicious", "persistence"])
                 n += 1
         except Exception as e:
+            if type(e).__name__ == "UnsupportedPluginError":
+                ctx.coverage("WMI subscriptions", "wbem\\Repository (CIM)", "absent", 0, "WMI repository not present / not readable")
+                return
             ctx.warn(f"WMI repository: {type(e).__name__}: {e}")
             ctx.coverage("WMI subscriptions", "wbem\\Repository (CIM)", "error", 0, str(e)[:200])
             return

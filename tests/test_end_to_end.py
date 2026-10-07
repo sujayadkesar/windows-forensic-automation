@@ -85,3 +85,9 @@ def test_report_files(dlp_case):
     assert any(f.endswith(".docx") for f in rep)
     assert any(f.endswith(".xlsx") for f in rep)
     assert any(f.endswith(".txt") for f in rep)
+
+
+def test_no_module_errors(dlp_case):
+    """Every examined location must end as found / not found / absent - never as an unhandled module error."""
+    errors = dlp_case.db.query("SELECT module, artifact, detail FROM coverage WHERE status='error'")
+    assert not errors, errors
