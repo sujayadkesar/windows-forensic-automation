@@ -4,6 +4,9 @@
 #   paths:    path fragments (installed location / artifact location)
 #   services: service names
 #   logs:     glob patterns (relative to the system drive) of tool logs worth collecting
+#   names:    whole words matched against installed-program names (Uninstall keys)
+#   dual_use: transfer tools that are reported as programs of interest in every case type (everyday
+#             sync / messaging clients are only reported by the data-exfiltration analyzers)
 # Contributions welcome - add a new entry and every module/analyzer picks it up.
 
 remote_access:
@@ -110,6 +113,7 @@ remote_access:
     services: [chromoting]
     logs: []
   Quick Assist:
+    builtin: true   # part of Windows 10 / 11: reported only when run, not for being present
     exe: [quickassist.exe]
     paths: ["\\quickassist"]
     services: []
@@ -146,17 +150,18 @@ archivers:
   Compress-Archive (PowerShell): {exe: []}
 
 transfer_tools:
-  rclone: {exe: [rclone.exe]}
-  MEGAsync / MEGAcmd: {exe: [megasync.exe, megacmd.exe, megacmdserver.exe, mega-put.exe]}
-  WinSCP: {exe: [winscp.exe]}
-  FileZilla: {exe: [filezilla.exe, fzsftp.exe]}
-  PuTTY SCP/SFTP: {exe: [pscp.exe, psftp.exe]}
+  rclone: {exe: [rclone.exe], dual_use: true}
+  MEGAsync / MEGAcmd: {exe: [megasync.exe, megacmd.exe, megacmdserver.exe, mega-put.exe], dual_use: true}
+  WinSCP: {exe: [winscp.exe], dual_use: true}
+  FileZilla: {exe: [filezilla.exe, fzsftp.exe], dual_use: true}
+  PuTTY SCP/SFTP: {exe: [pscp.exe, psftp.exe], dual_use: true}
+  CuteFTP: {exe: [cuteftp.exe, cuteftp32.exe, cuteftppro.exe], names: [CuteFTP], dual_use: true}
   curl / wget: {exe: [curl.exe, wget.exe]}
   FTP client: {exe: [ftp.exe]}
   Robocopy / Xcopy: {exe: [robocopy.exe, xcopy.exe]}
   TeraCopy: {exe: [teracopy.exe]}
   FastCopy: {exe: [fastcopy.exe]}
-  Restic: {exe: [restic.exe]}
+  Restic: {exe: [restic.exe], dual_use: true}
   BITSAdmin: {exe: [bitsadmin.exe]}
   Google Drive for desktop: {exe: [googledrivefs.exe]}
   Google Drive / Backup and Sync (legacy client): {exe: [googledrivesync.exe]}
@@ -187,6 +192,37 @@ anti_forensics:
   Event log clearing (wevtutil): {exe: [wevtutil.exe]}
   File shredders: {exe: [fileshredder.exe, freeraser.exe, hardwipe.exe]}
   Disk wipers: {exe: [dban.exe, killdisk.exe, diskwipe.exe]}
+
+# Credential theft, sniffing, scanning and exploitation tools: legitimate in security work, reported as programs of
+# interest wherever they are installed or run.
+hacking_tools:
+  Mimikatz: {exe: [mimikatz.exe], names: [mimikatz]}
+  Cain & Abel: {exe: [cain.exe, abel.exe, abel64.exe], names: ["Cain & Abel"], paths: ['\program files\cain\']}
+  Ethereal / Wireshark (packet capture): {exe: [ethereal.exe, tethereal.exe, wireshark.exe, tshark.exe, dumpcap.exe],
+                                          names: [Ethereal, Wireshark]}
+  NetStumbler (wireless discovery): {exe: [netstumbler.exe], names: [NetStumbler, Network Stumbler]}
+  Look@LAN (network discovery): {exe: [lookatlan.exe], names: [Look@LAN]}
+  123 Write All Stored Passwords: {exe: [123wasp.exe], names: ["123 Write All Stored Passwords"]}
+  Anonymizer: {exe: [], names: [Anonymizer]}
+  Nmap: {exe: [nmap.exe, zenmap.exe, ncat.exe], names: [Nmap]}
+  Netcat: {exe: [nc.exe, nc64.exe, netcat.exe]}
+  Advanced IP Scanner: {exe: [advanced_ip_scanner.exe, advanced_ip_scanner_console.exe], names: [Advanced IP Scanner]}
+  Angry IP Scanner: {exe: [ipscan.exe, ipscan-win64.exe, ipscan-win32.exe], names: [Angry IP Scanner]}
+  SoftPerfect Network Scanner: {exe: [netscan.exe], names: [SoftPerfect Network Scanner]}
+  AdFind: {exe: [adfind.exe]}
+  SharpHound / BloodHound: {exe: [sharphound.exe, bloodhound.exe]}
+  Rubeus: {exe: [rubeus.exe]}
+  Kerbrute: {exe: [kerbrute.exe, kerbrute_windows_amd64.exe, kerbrute_windows_386.exe]}
+  LaZagne: {exe: [lazagne.exe]}
+  Impacket (compiled): {exe: [secretsdump.exe, wmiexec.exe, smbexec.exe, atexec.exe, dcomexec.exe]}
+  NirSoft password recovery: {exe: [webbrowserpassview.exe, mailpv.exe, netpass.exe, passwordfox.exe, chromepass.exe,
+                                    wirelesskeyview.exe, pspv.exe, rdpv.exe, iepv.exe, mspass.exe, dialupass.exe]}
+  John the Ripper: {exe: [john.exe], names: [John the Ripper]}
+  Hashcat: {exe: [hashcat.exe], names: [hashcat]}
+  THC Hydra: {exe: [hydra.exe], names: [THC-Hydra]}
+  Aircrack-ng: {exe: [aircrack-ng.exe, airodump-ng.exe, aireplay-ng.exe], names: [Aircrack-ng]}
+  Metasploit: {exe: [msfconsole.exe, msfvenom.exe], names: [Metasploit]}
+  Cobalt Strike beacon (default names): {exe: [beacon.exe, beacon_x64.exe]}
 
 lolbins: [powershell.exe, pwsh.exe, cmd.exe, mshta.exe, rundll32.exe, regsvr32.exe, wscript.exe, cscript.exe, certutil.exe,
           bitsadmin.exe, msiexec.exe, installutil.exe, regasm.exe, regsvcs.exe, msbuild.exe, cmstp.exe, wmic.exe, forfiles.exe,

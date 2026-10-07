@@ -10,6 +10,7 @@ from ..knowledge import remote_access_tools
 from .base import ArtifactModule, ArtifactType, C, register
 
 RX_IP = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+COMPONENT_STORE = re.compile(r"^\\windows\\(winsxs|servicing|softwaredistribution)\\", re.I)
 
 
 @register
@@ -59,11 +60,13 @@ class RemoteAccessModule(ArtifactModule):
                 ph = ",".join("?" * len(exes))
                 for r in ctx.db.query(f"SELECT path, volume, si_created, deleted FROM fs_entries WHERE evidence_id=? AND lower(name) IN ({ph})",
                                       (ctx.evidence_id, *exes)):
+                    if COMPONENT_STORE.match(r["path"] or ""):
+                        continue  # Windows component store copies are not installations
                     add(tool, "file", f"File {'(deleted) ' if r['deleted'] else ''}{ctx.display_path(r['volume'], r['path'])}",
                         r["si_created"])
             for p in paths:
-                r = ctx.db.query("SELECT path, volume, si_created FROM fs_entries WHERE evidence_id=? AND lower(path) LIKE ? LIMIT 1",
-                                 (ctx.evidence_id, f"%{p}%"))
+                r = [x for x in ctx.db.query("SELECT path, volume, si_created FROM fs_entries WHERE evidence_id=? AND lower(path) LIKE ? "
+                                             "LIMIT 50", (ctx.evidence_id, f"%{p}%")) if not COMPONENT_STORE.match(x["path"] or "")]
                 if r:
                     add(tool, "file", f"Folder/file {ctx.display_path(r[0]['volume'], r[0]['path'])}", r[0]["si_created"])
             for typ, field in (("prefetch", "executable"), ("amcache", "path"), ("bam", "path"), ("shimcache", "path"),
@@ -99,7 +102,10 @@ class RemoteAccessModule(ArtifactModule):
                     add(tool, "file", f"Log {p}")
                     found[tool]["connections"] += self._parse_log(ctx, tool, str(p), p.name.lower(), text)
             ctx.progress((i + 1) / max(1, len(tools)))
-        for tool, f in found.items():
+        for tool, f in list(found.items()):
+            if tools[tool].get("builtin") and not (f["executed"] or f["service"] or f["connections"]):
+                del found[tool]  # part of Windows: only a run or a session is of interest
+                continue
             times = sorted(t for t in f["times"] if t)
             ctx.emit("rmm_tool", times[0] if times else None, {
                 "tool": tool, "evidence": " | ".join(dict.fromkeys(f["evidence"]))[:3000], "first_seen": times[0] if times else None,

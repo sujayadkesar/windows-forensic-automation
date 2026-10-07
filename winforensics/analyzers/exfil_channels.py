@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import re
 
-from ..knowledge import tool_for_exe
+from ..knowledge import document_extensions, tool_for_exe
 from .base import INDICATED, NA, NO, YES, Analyzer, analyzer, callout, table_figure
-from .common import classify, BROWSER_EXES, EXFIL_CATS, basename, mentions_target, near, ref, short, target_names
+from .common import (BROWSER_EXES, EXFIL_CATS, basename, classify, mentions_target, near, ref, sender_impersonation, short,
+                     target_names)
 
 UPLOAD_HINT = re.compile(r"compose|upload|attach|#sent|/sent|share|send|transfer|new\?|/new|drop|paste|create", re.I)
 
@@ -299,7 +300,6 @@ class ExfilChannelsAnalyzer(Analyzer):
                 corr[addr.lower()] = corr.get(addr.lower(), 0) + 1
         top = ", ".join(f"{k} ({v})" for k, v in sorted(corr.items(), key=lambda kv: -kv[1])[:6])
         sent = [r for r in rows if "sent" in r[1].lower()]
-        with_att = [r for r in rows if r[5]]
         desc = (f"The mail store holds {len(msgs)} messages. Listed below are {len(rows)} sent, deleted or attachment-carrying "
                 f"messages" + (f", including {len(deleted)} message(s) that the Windows Search index recorded but that are no longer "
                                "in the mailbox (deleted)" if deleted else "") + f". Addresses seen: {top or '-'}.")
@@ -318,10 +318,37 @@ class ExfilChannelsAnalyzer(Analyzer):
             actx.timeline(eid, d.get("sent") or a["ts"], "E-mail", "E-mail sent / deleted / with attachment",
                           f"{d.get('subject')} - {d.get('sender') or d.get('from') or ''} -> {d.get('to') or ''}",
                           ref_kind="artifact", ref_id=a["id"], flagged=True)
-        if with_att and sent:
-            actx.answer("dlp.other_channels", INDICATED, f"{actx.ev_label(eid)}: {len(sent)} sent e-mail(s); attachments sent: "
-                                                         f"{', '.join(sorted({r[5] for r in with_att if r[5]})[:4])} "
-                                                         f"(correspondents: {top}).", [fid])
+        # attachments of sent messages with their destination (documents first; unnamed MIME parts are not files)
+        docs = document_extensions()
+        sent_files = sorted({(n, r[3], r[0]) for r in sent for n in str(r[5] or "").split(", ")
+                             if n and not re.fullmatch(r"attachment(_\d+)?", n, re.I)},
+                            key=lambda x: (x[0].rsplit(".", 1)[-1].lower() not in docs, x[2]))
+        spoofed = [a for a in msgs if sender_impersonation(a["data"].get("sender"))]
+        if spoofed:
+            ex = sender_impersonation(spoofed[0]["data"].get("sender"))
+            fid2 = actx.finding(f"Sender impersonation in received e-mail on {actx.ev_label(eid)}",
+                                f"{len(spoofed)} received message(s) show an e-mail address in the sender's display name that is "
+                                f"not the address they came from (for example '{ex[0]}' sent from {ex[1]}) - the pattern of "
+                                "business e-mail compromise / CEO fraud.", evidence_id=eid, severity="high", confidence="high",
+                                category="E-mail", ts=spoofed[0]["ts"], refs=[ref(a) for a in spoofed],
+                                figures=[table_figure("Display name differs from the sender address",
+                                                      ["Time (UTC)", "Folder", "Display name", "Real sender address", "Subject",
+                                                       "Attachments"],
+                                                      [[short(a["ts"]), a["data"].get("folder"), *sender_impersonation(a["data"].get("sender")),
+                                                        a["data"].get("subject"), a["data"].get("attachment_names") or ""]
+                                                       for a in spoofed[:30]], style="table", highlight_rows=list(range(min(30, len(spoofed)))),
+                                                      col_widths=[140, 170, 170, 200, 260, 160])],
+                                questions=["dlp.other_channels", "phish.email"], tags=["email", "phishing"], mitre=["T1566", "T1656"])
+            actx.answer("dlp.other_channels", INDICATED, f"{actx.ev_label(eid)}: {len(spoofed)} received message(s) with an "
+                                                         "impersonated sender address.", [fid2])
+        copies = {(a["data"].get("filename"), short(a["ts"])): a["data"].get("local_copies")
+                  for a in actx.artifacts("email_attachment", eid) if a["data"].get("local_copies")}
+        if sent_files:
+            actx.answer("dlp.other_channels", INDICATED, f"{actx.ev_label(eid)}: {len(sent)} sent e-mail(s); files sent: "
+                                                         + "; ".join(f"{n} to {to} ({t})" + (f", byte-identical to {copies[(n, t)]}"
+                                                                                             if copies.get((n, t)) else "")
+                                                                     for n, to, t in sent_files[:5])
+                                                         + f" (correspondents: {top}).", [fid])
         elif sent:
             actx.answer("dlp.other_channels", INDICATED, f"{actx.ev_label(eid)}: e-mail correspondence with {top}.", [fid])
 

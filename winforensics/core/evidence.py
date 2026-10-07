@@ -350,7 +350,9 @@ def windows_details(t) -> dict:
     cv = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
     d["product_name"] = val(cv, "ProductName")
     d["display_version"] = val(cv, "DisplayVersion") or val(cv, "ReleaseId")
-    d["build"] = val(cv, "CurrentBuild") or val(cv, "CurrentBuildNumber")
+    # Windows XP / 2003 keep a placeholder in CurrentBuild ("1.511.1 () (Obsolete data - do not use)")
+    cb = val(cv, "CurrentBuild")
+    d["build"] = cb if cb and str(cb).isdigit() else val(cv, "CurrentBuildNumber") or cb
     ubr = val(cv, "UBR")
     if ubr is not None and d["build"]:
         d["build"] = f"{d['build']}.{ubr}"

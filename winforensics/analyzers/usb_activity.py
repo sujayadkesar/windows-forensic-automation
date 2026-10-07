@@ -160,12 +160,12 @@ class UsbActivityAnalyzer(Analyzer):
                                    refs=[ref(d)] + [ref(s) for s in dev_sessions[:20]], figures=figs,
                                    questions=["dlp.usb"] + (["dlp.device_match"] if is_match else []),
                                    tags=["usb"] + (["dlp_match"] if is_match else []), mitre=["T1052.001"] if is_match else [])
-                actx.answer("dlp.usb", YES, f"{actx.ev_label(eid)}: {name} S/N {dd.get('serial')} "
-                                            f"(first connected {short(dd.get('first_seen'))} UTC"
-                                            + (f", last connected {short(dd.get('last_connected'))} UTC" if dd.get("last_connected")
-                                               else f", connected after the last reboot {short(dd.get('connected_after_boot'))} UTC"
-                                               if dd.get("connected_after_boot") else "")
-                                            + (f", user {dd.get('users')}" if dd.get("users") else "") + ").", [fid])
+                times = ([f"first connected {short(dd.get('first_seen'))} UTC"] if dd.get("first_seen") else []) + \
+                    ([f"last connected {short(dd.get('last_connected'))} UTC"] if dd.get("last_connected") else
+                     [f"connected after the last reboot {short(dd.get('connected_after_boot'))} UTC"] if dd.get("connected_after_boot") else []) + \
+                    ([f"user {dd.get('users')}"] if dd.get("users") else [])
+                actx.answer("dlp.usb", YES, f"{actx.ev_label(eid)}: {name} S/N {dd.get('serial')}"
+                                            + (f" ({', '.join(times)})" if times else "") + ".", [fid])
                 if is_match:
                     matched_on.append((eid, fid))
                     actx.answer("dlp.device_match", YES, f"The DLP-reported device S/N {dd.get('serial')} was connected to "

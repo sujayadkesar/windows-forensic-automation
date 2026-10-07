@@ -200,6 +200,13 @@ def test_q21_q45_emails_including_deleted(db):
     assert any(s == "Hello, Iaman" for s in sent)
 
 
+def test_q20_mail_account(db):
+    # Outlook 2013 profile: one Exchange account (the address book entry of the profile is not an account)
+    acc = arts(db, "email_account")
+    assert [a["email"] for a in acc] == ["iaman.informant@nist.gov"]
+    assert acc[0]["client"].endswith("Exchange")
+
+
 # --------------------------------------------------------------------------- file system accuracy (Q23, Q36, Q37, Q52)
 def test_usn_paths_follow_sequence_numbers(db):
     """Parent folders whose MFT records were reused must not be resolved to the record's new owner."""

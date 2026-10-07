@@ -92,6 +92,20 @@ class SystemInfoModule(ArtifactModule):
                             "LastLoggedOnUser")
         if lastuser:
             rows.append(("Last logged on user", lastuser, "SOFTWARE\\...\\Authentication\\LogonUI"))
+        wl = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon"
+        du, dd = val_path(reg, wl, "DefaultUserName"), val_path(reg, wl, "DefaultDomainName")
+        if du:
+            rows.append(("Default user name (Winlogon)", f"{dd}\\{du}" if dd else du, "SOFTWARE\\...\\Winlogon\\DefaultUserName"))
+        dom = _lsa_string(val_path(reg, "HKLM\\SECURITY\\Policy\\PolPrDmN", "(Default)") or
+                          val_path(reg, "HKLM\\SECURITY\\Policy\\PolPrDmN", ""))
+        if dom:
+            rows.append(("Primary domain / workgroup (LSA)", dom, "SECURITY\\Policy\\PolPrDmN"))
+        for k in iter_keys(reg, "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkCards"):
+            for card in subkeys(k):
+                desc = val(card, "Description")
+                if desc:
+                    rows.append(("Network adapter", f"{desc} (service {val(card, 'ServiceName') or '-'})",
+                                 f"SOFTWARE\\...\\CurrentVersion\\NetworkCards\\{card.name}"))
         prof = val_path(reg, "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management", "PagingFiles")
         if prof:
             rows.append(("Paging files", " | ".join(prof) if isinstance(prof, list) else prof,
@@ -244,7 +258,8 @@ class SystemInfoModule(ArtifactModule):
                         continue
                     rec = {"name": name, "version": val(p, "DisplayVersion"), "publisher": val(p, "Publisher"),
                            "install_date": val(p, "InstallDate"), "install_location": val(p, "InstallLocation"),
-                           "uninstall": val(p, "UninstallString"), "key_modified": db_ts(ts_of(p)),
+                           "uninstall": val(p, "UninstallString"), "display_icon": val(p, "DisplayIcon"),
+                           "key_modified": db_ts(ts_of(p)),
                            "scope": scope + (f" ({user})" if user else ""), "key": p.name}
                     ctx.emit("installed_program", ts_of(p), rec, user=user, summary=f"Installed: {name}",
                              source=f"{path}\\{p.name}", ts_label="Key last written")
@@ -257,6 +272,20 @@ def val_path(reg, path: str, name: str):
         return reg.key(path).value(name).value
     except Exception:
         return None
+
+
+def _lsa_string(data) -> str:
+    """LSA policy UNICODE_STRING (PolPrDmN): Length, MaximumLength, then the buffer offset (32-bit: DWORD at 4,
+    64-bit: QWORD at 8), followed by the UTF-16 text."""
+    if not isinstance(data, (bytes, bytearray)) or len(data) < 8:
+        return ""
+    ln = struct.unpack_from("<H", data, 0)[0]
+    for off in (struct.unpack_from("<I", data, 4)[0], struct.unpack_from("<Q", data, 8)[0] if len(data) >= 16 else -1):
+        if 0 < off and off + ln <= len(data) and ln % 2 == 0:
+            s = bytes(data[off:off + ln]).decode("utf-16-le", "replace")
+            if s and s.isprintable():
+                return s
+    return ""
 
 
 def _v_string(v: bytes, entry: int) -> str | None:

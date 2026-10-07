@@ -144,3 +144,22 @@ anti_forensics:
   Privacy cleaners: [ccleaner.com, bleachbit.org, privazer.com, wisecleaner.com]
   USB history removal: [usboblivion, nirsoft.net/utils/usb_devices_view]
   Secure delete: [eraser.heidi.ie, sysinternals.com/sdelete, learn.microsoft.com/en-us/sysinternals/downloads/sdelete]
+
+# Official download hosts of widely used software (vendor-controlled; no user-uploaded content).  An installer whose
+# Mark of the Web points here and that was run from Downloads is ordinary software installation.
+software_vendor:
+  Google: [dl.google.com, dl-ssl.google.com]
+  Microsoft: [download.microsoft.com, officecdn.microsoft.com, download.visualstudio.microsoft.com, update.code.visualstudio.com,
+              statics.teams.cdn.office.net, oneclient.sfx.ms, go.microsoft.com/fwlink]
+  Mozilla: [download.mozilla.org, download-installer.cdn.mozilla.net]
+  Zoom: [zoom.us/client/, cdn.zoom.us]
+  Adobe: [ardownload2.adobe.com, admdownload.adobe.com, get.adobe.com]
+  7-Zip: [7-zip.org]
+  WinRAR: [win-rar.com, rarlab.com]
+  VideoLAN: [get.videolan.org, download.videolan.org]
+  Slack: [downloads.slack-edge.com]
+  Python: [python.org/ftp/]
+  Oracle Java: [javadl.oracle.com]
+  Discord: [dl.discordapp.net]
+  Spotify: [download.scdn.co]
+  Webex: [binaries.webex.com]

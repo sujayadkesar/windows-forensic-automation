@@ -52,7 +52,7 @@ CATEGORY_TITLES = {
     "webmail": "Webmail", "mail_attachment": "Mail attachment", "cloud_storage": "Cloud storage",
     "file_transfer": "File transfer service", "paste_site": "Paste site", "messaging": "Messaging / collaboration",
     "code_hosting": "Code hosting", "ai_assistant": "AI assistant", "job_search": "Job search",
-    "remote_access": "Remote access / RMM", "anti_forensics": "Anti-forensics",
+    "remote_access": "Remote access / RMM", "anti_forensics": "Anti-forensics", "software_vendor": "Software vendor",
 }
 
 # categories that can receive data from the user (upload destinations)
@@ -115,13 +115,43 @@ def category_title(cat: str) -> str:
 def _exe_index() -> dict[str, list[tuple[str, str]]]:
     idx: dict[str, list[tuple[str, str]]] = {}
     tools = load("tools")
-    for family in ("remote_access", "archivers", "transfer_tools", "anti_forensics"):
+    for family in TOOL_FAMILIES:
         for name, spec in (tools.get(family) or {}).items():
             for exe in (spec or {}).get("exe", []) or []:
                 idx.setdefault(exe.lower(), []).append((family, name))
     for exe in tools.get("lolbins", []) or []:
         idx.setdefault(exe.lower(), []).append(("lolbin", exe))
     return idx
+
+
+TOOL_FAMILIES = ("remote_access", "archivers", "transfer_tools", "anti_forensics", "hacking_tools")
+
+
+@lru_cache(maxsize=1)
+def _name_index() -> list[tuple[re.Pattern, str, str]]:
+    out = []
+    tools = load("tools")
+    for family in TOOL_FAMILIES:
+        for name, spec in (tools.get(family) or {}).items():
+            for n in (spec or {}).get("names", []) or []:
+                out.append((re.compile(r"(?<![\w@&])" + re.escape(n) + r"(?![\w@&])", re.I), family, name))
+    return out
+
+
+def tool_for_program(display_name: str) -> list[tuple[str, str]]:
+    """[(family, tool name)] for an installed-program name (whole-word match of the tool's ``names``)."""
+    return [(fam, tool) for rx, fam, tool in _name_index() if rx.search(str(display_name or ""))]
+
+
+@lru_cache(maxsize=1)
+def dual_use_tools() -> frozenset:
+    """Tool names reported as programs of interest in every case type."""
+    tools = load("tools")
+    out = set()
+    for family in ("remote_access", "anti_forensics", "hacking_tools"):
+        out |= set(tools.get(family) or {})
+    out |= {n for n, spec in (tools.get("transfer_tools") or {}).items() if (spec or {}).get("dual_use")}
+    return frozenset(out)
 
 
 def tool_for_exe(path_or_name: str) -> list[tuple[str, str]]:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import re
 import struct
 
@@ -273,6 +274,64 @@ class FilesModule(ArtifactModule):
                      source=rec["i_file"], ts_label="Deleted")
             n += 1
         ctx.coverage("Recycle Bin ($I files)", "<drive>\\$Recycle.Bin\\<SID>", "found" if n else "not_found", n)
+        m = self._info2(ctx)
+        if m or ctx.fs_files("lower(path) LIKE '%\\recycler\\%' OR lower(path) LIKE '%\\recycled\\%'", limit=1):
+            ctx.coverage("Recycle Bin (INFO2, Windows 2000 / XP / 2003)", "<drive>\\RECYCLER\\<SID>\\INFO2",
+                         "found" if m else "not_found", m)
+
+    def _info2(self, ctx) -> int:
+        """Windows 2000 / XP / 2003 Recycle Bin: RECYCLER\\<SID>\\INFO2 holds one record per deleted item and the content
+        is renamed to D<drive letter><index><extension> in the same folder.  Record (800 bytes): ANSI path [0:260], index,
+        drive number, deletion FILETIME, size, Unicode path [280:800].  Restoring or emptying clears the first path byte."""
+        n = 0
+        for row in ctx.fs_files("(lower(path) LIKE '%\\recycler\\%' OR lower(path) LIKE '%\\recycled\\%') AND lower(name)='info2'",
+                                include_deleted=True):
+            try:
+                data = ctx.read_entry(row, 64 * 1024 * 1024)
+            except Exception:
+                continue
+            if len(data) < 20:
+                continue
+            rec_size = struct.unpack_from("<I", data, 12)[0]
+            if rec_size not in (280, 800):  # 280: ANSI-only records (Windows 9x)
+                continue
+            folder = row["path"][: -len(row["name"])]
+            content = {r["name"].lower(): r for r in ctx.fs_files("volume=? AND lower(path) LIKE ?",
+                                                                    (row["volume"], folder.lower() + "%"), include_deleted=True)
+                       if r["path"][: -len(r["name"])].lower() == folder.lower()}
+            sid = folder.strip("\\").split("\\")[-1] if folder.count("\\") >= 3 else ""
+            user = next((p["name"] for p in ctx.user_profiles() if p.get("sid") == sid), None)
+            for off in range(20, len(data) - rec_size + 1, rec_size):
+                r = data[off:off + rec_size]
+                idx, drive = struct.unpack_from("<II", r, 260)
+                ft = struct.unpack_from("<Q", r, 268)[0]
+                size = struct.unpack_from("<I", r, 276)[0]
+                removed = r[0] == 0
+                ansi = r[1 if removed else 0:260].split(b"\x00")[0].decode("latin-1")
+                letter = chr(ord("A") + drive) if drive < 26 else "?"
+                uni = r[280:800].decode("utf-16-le", "replace").split("\x00")[0] if rec_size == 800 else ""
+                orig = uni if uni[1:3] == ":\\" else (letter + ansi if removed else ansi)
+                if not orig.strip() or not ft:
+                    continue
+                ext = os.path.splitext(orig)[1]
+                cname = f"D{letter.lower()}{idx}{ext}"
+                crow = content.get(cname.lower())
+                sha = ""
+                if crow and not crow.get("deleted") and (crow.get("size") or 0) <= 512 * 1024 * 1024:
+                    try:
+                        sha = hashlib.sha256(ctx.read_entry(crow)).hexdigest()
+                    except Exception:
+                        sha = ""
+                deleted = filetime(ft)
+                present = ("Yes" if crow and not crow.get("deleted") else "Deleted (emptied)" if crow else "No") if not removed \
+                    else "No - entry restored or emptied"
+                rec = {"original_path": orig, "size": size, "deleted_time": db_ts(deleted), "r_file": cname, "r_present": present,
+                       "sha256": sha, "sid": sid, "i_file": ctx.display_path(row["volume"], row["path"]), "index": idx,
+                       "i_deleted": bool(row.get("deleted"))}
+                ctx.emit("recycle_bin", deleted, rec, user=user, summary=f"Recycled {orig} ({size} bytes) at {rec['deleted_time']}",
+                         source=f"{rec['i_file']} (record {idx})", ts_label="Deleted")
+                n += 1
+        return n
 
     # ------------------------------------------------------------------ ActivitiesCache
     def _activities(self, ctx) -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 
+from ..core.paths import PROTECTED_DATA, command_paths, norm_path
 from ..core.timeutil import db_ts, parse_any
 from ..knowledge import score_command, tool_for_exe
 from ._regutil import iter_keys, key_user, subkeys, ts_of, val, values
@@ -25,12 +26,27 @@ SVC_TYPE = {1: "Kernel driver", 2: "File system driver", 16: "Own process", 32: 
 NS = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
 
 
+def parse_task_xml(raw: bytes):
+    """Task Scheduler XML.  Windows writes UTF-16 with a BOM and `encoding="UTF-16"` in the declaration; the text is
+    decoded here and the declaration dropped, so the parser does not reject re-encoded input."""
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        text = raw.decode("utf-16")
+    elif raw[:3] == b"\xef\xbb\xbf":
+        text = raw[3:].decode("utf-8", "replace")
+    else:
+        text = raw.decode("utf-8", "replace")
+    text = re.sub(r"^\s*<\?xml[^>]*\?>", "", text.lstrip("﻿"))
+    return ET.fromstring(text)
+
+
 def _score(cmd: str) -> tuple[int, str, list]:
     sc = score_command(cmd)
     low = (cmd or "").lower()
     extra = 0
     reasons = [m["title"] for m in sc["matches"]]
-    if re.search(r"\\(appdata|temp|programdata|users\\public|downloads)\\", low):
+    # judged on the program the entry starts (and scripts it passes to an interpreter), not on other arguments
+    if any(re.search(r"\\(appdata|temp|programdata|users\\public|downloads)\\", p) and not PROTECTED_DATA.search(p)
+           for p in map(norm_path, command_paths(cmd))):
         extra += 3
         reasons.append("Runs from user-writable folder")
     if any(fam == "remote_access" for fam, _ in tool_for_exe(re.split(r"\s", low.strip('"'))[0] if low else "")):
@@ -175,13 +191,12 @@ class PersistenceModule(ArtifactModule):
 
     def _tasks(self, ctx, reg) -> None:
         rows = ctx.fs_files("lower(path) LIKE '\\windows\\system32\\tasks\\%'", limit=20000)
-        n = 0
+        n, bad = 0, 0
         for row in rows:
             try:
-                raw = ctx.read_entry(row, 1_000_000)
-                text = raw.decode("utf-16") if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else raw.decode("utf-8", "replace")
-                root = ET.fromstring(text.lstrip("\ufeff").encode("utf-8"))
+                root = parse_task_xml(ctx.read_entry(row, 1_000_000))
             except Exception:
+                bad += 1
                 continue
 
             def f(path):
@@ -212,7 +227,8 @@ class PersistenceModule(ArtifactModule):
                      source=ctx.display_path(row["volume"], row["path"]), ts_label="Registered",
                      tags=["suspicious"] if score >= 6 else None)
             n += 1
-        ctx.coverage("Scheduled tasks", "C:\\Windows\\System32\\Tasks", "found" if n else ("not_found" if rows else "absent"), n)
+        ctx.coverage("Scheduled tasks", "C:\\Windows\\System32\\Tasks", "found" if n else ("not_found" if rows else "absent"), n,
+                     f"{bad} task file(s) could not be parsed" if bad else "")
 
     def _startup(self, ctx, reg) -> None:
         rows = ctx.fs_files("lower(path) LIKE '%\\start menu\\programs\\startup\\%' AND lower(name) <> 'desktop.ini'")

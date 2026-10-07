@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
+from datetime import timedelta
 
+from ..core.timeutil import from_db
 from ..knowledge import tool_for_exe
-from ..modules._usbutil import serial_key
-from .base import INDICATED, NO, YES, Analyzer, analyzer, callout, table_figure
-from .common import mentions_target, ref, short
+from ..modules.filesystem import TIMESTOMP_STRONG
+from .base import INCONCLUSIVE, NO, YES, Analyzer, analyzer, callout, table_figure
+from .common import in_installed_program, mentions_target, ref, short
+
+# folders archive tools extract into (XP compressed folders, Windows 7+ zip, WinRAR, 7-Zip, WinZip, InstallShield)
+EXTRACTED = re.compile(r"\\temporary directory \d+ for [^\\]+\\|\\temp\d+_[^\\]+\.zip\\|\\rar\$ex[a-z0-9.]+\\|\\7z[a-z0-9]{3,}\\|"
+                       r"\\wz[0-9a-f]{3,}\\|\\_ir_sf_temp_\d+\\", re.I)
 
 SEARCH_TERMS = re.compile(r"clear (usb|history|logs?|traces?)|delete (usb|history|logs?|browsing)|remove usb|usb ?oblivion|"
                           r"ccleaner|bleachbit|wipe (disk|drive|free space|history)|shred|anti.?forensic|hide (files|folder)|"
@@ -69,15 +76,28 @@ class AntiForensicsAnalyzer(Analyzer):
                                  r"sdelete|vssadmin.*delete|wmic.*shadowcopy.*delete|remove-item.*-recurse.*(prefetch|recent)|"
                                  r"del\s.*\\prefetch\\|clear-recyclebin|rd\s+/s.*recycle", txt, re.I):
                         add(a["ts"], f"Destructive / cleanup command ({typ.replace('_', ' ')})", txt, a)
-            for a in actx.artifacts("timestamp_anomaly", eid):
+            anomalies = actx.artifacts("timestamp_anomaly", eid)
+            # installers and app packages lay down whole folders with archived times in one go; a timestamp tool is
+            # pointed at individual files - so the same signature on many files of one folder within a minute is a copy
+            batch = Counter(((a["data"].get("file") or "").lower().rsplit("\\", 1)[0], str(a["data"].get("fn_created"))[:16])
+                            for a in anomalies)
+            # files Windows Setup (or a feature update) lays down keep their media times: $FN created on the install day
+            installed = from_db((e.get("os") or {}).get("install_date"))
+            for a in anomalies:
                 f = (a["data"].get("file") or "").lower()
-                # $SI earlier than $FN is normal for files laid down by Windows setup / installers
-                if re.match(r"^[a-z]:\\(windows|program files|programdata\\microsoft|\$recycle|system volume information)", f) \
-                        and not mentions_target(actx, f):
+                # $SI earlier than $FN is normal for files laid down by Windows setup / installers, and for files extracted
+                # from an archive (the extractor restores the archived file times)
+                if (re.match(r"^[a-z]:\\(windows|program files|programdata\\microsoft|\$recycle|system volume information)", f)
+                        or EXTRACTED.search(f)) and not mentions_target(actx, f):
                     continue
-                if mentions_target(actx, a["data"].get("file")) or len(rows) < 200:
+                single = batch[(f.rsplit("\\", 1)[0], str(a["data"].get("fn_created"))[:16])] < 3
+                fn_c = from_db(a["data"].get("fn_created"))
+                setup = bool(installed and fn_c and abs(fn_c - installed) <= timedelta(days=1))
+                tool_like = a["data"].get("anomaly") == TIMESTOMP_STRONG and single and not setup \
+                    and "\\appdata\\local\\packages\\" not in f and not in_installed_program(actx, eid, f)
+                if mentions_target(actx, a["data"].get("file")) or tool_like or len(rows) < 200:
                     add(a["ts"], "Timestamp anomaly ($SI vs $FN)", f"{a['data'].get('file')}: {a['data'].get('anomaly')}", a,
-                        strong=bool(mentions_target(actx, a["data"].get("file"))))
+                        strong=bool(mentions_target(actx, a["data"].get("file"))) or tool_like)
             for a in actx.artifacts("evt_system", eid):
                 if "time changed" in (a["data"].get("description") or "").lower():
                     add(a["ts"], "System time changed", a["data"].get("details"), a, strong=False)
@@ -101,13 +121,25 @@ class AntiForensicsAnalyzer(Analyzer):
                     add(deleted_at, "Secure deletion pattern ($UsnJrnl: renamed to random names, then deleted)",
                         f"{before} - renamed {len(names)} times ({', '.join(names[:4])}...) between {t0[:19]} and "
                         f"{t1[:19]} UTC, then deleted", None)
-            # device history removed from the registry while still in event logs
-            reg = {serial_key(d["data"].get("serial")) for d in actx.artifacts("usb_device", eid) if "Enum" in (d["data"].get("sources") or "")}
-            evt = {serial_key(u["data"].get("serial")) for u in actx.artifacts("usb_event", eid)
-                   if u["data"].get("event_id") in (1006, 400, 410) and u["data"].get("serial")}
-            missing = sorted(s for s in evt - reg if s)
-            for s in missing:
-                add(None, "USB device in event logs but absent from registry (device history cleaned?)", s, None)
+            # device history removed from the registry while still in event logs.  Only removable devices with a real serial
+            # count, and only when the SYSTEM hive on disk was written after the device was last seen (a hive flushed
+            # before the connection simply predates it).  Windows' Plug and Play cleanup task removes devices unused for
+            # 30 days, so older absences are weak.
+            hive = actx.db.query("SELECT si_modified FROM fs_entries WHERE evidence_id=? AND lower(path)=? AND deleted=0",
+                                 (eid, "\\windows\\system32\\config\\system"))
+            hive_t = from_db(hive[0]["si_modified"]) if hive else None
+            for d in actx.artifacts("usb_device", eid):
+                dd = d["data"]
+                if "Enum" in (dd.get("sources") or "") or dd.get("serial_generated") or "EVTX" not in (dd.get("sources") or ""):
+                    continue
+                last = from_db(dd.get("last_connected") or dd.get("first_seen"))
+                if not (hive_t and last) or last >= hive_t:
+                    continue
+                label = f"{dd.get('vendor') or ''} {dd.get('product') or ''} S/N {dd.get('serial')}".strip()
+                add(dd.get("last_connected") or dd.get("first_seen"),
+                    "USB device in event logs but absent from the registry (device history removed?)",
+                    f"{label}; last seen {str(last)[:19]} UTC, SYSTEM hive written {str(hive_t)[:19]} UTC", d,
+                    strong=hive_t - last <= timedelta(days=30))
             # logs that do not cover the period of interest
             start, end = actx.window
             for a in actx.artifacts("evtx_log", eid):
@@ -138,8 +170,11 @@ class AntiForensicsAnalyzer(Analyzer):
                                                      highlight_rows=hl, col_widths=[150, 330, 430, 80],
                                                      callouts=[callout(hl[0], 1, 1, "Attempt to remove traces")] if hl else [])],
                                questions=["anti_forensics"], tags=["anti_forensics"], mitre=["T1070"])
-            actx.answer("anti_forensics", YES if strong else INDICATED,
-                        f"{actx.ev_label(eid)}: " + "; ".join(sorted({r[1].split(' (')[0] for r in strong or rows}))[:300] + ".", [fid])
+            # weak indicators (timestamp anomalies, time changes, emptied Recycle Bin, ...) each have common benign
+            # explanations: on their own they leave the question open rather than indicating anti-forensics
+            actx.answer("anti_forensics", YES if strong else INCONCLUSIVE,
+                        f"{actx.ev_label(eid)}: " + "; ".join(sorted({r[1].split(' (')[0] for r in strong or rows}))[:300]
+                        + ("." if strong else " - weak indicators only, each with common benign explanations; review them."), [fid])
         if not found_any:
             actx.answer("anti_forensics", NO, "No log clearing, cleaner/wiper tools, trace-removal searches, destructive commands "
                                               "or timestamp manipulation were identified.", [])

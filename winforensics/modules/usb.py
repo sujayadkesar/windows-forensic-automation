@@ -31,6 +31,15 @@ RX_SETUPAPI_START = re.compile(r">>>\s+Section start\s+(\d{4}/\d{2}/\d{2} \d{2}:
 RX_EMD = re.compile(r"#(?P<serial>[^#]+)#\{[0-9a-f-]+\}(?P<label>.*?)_(?P<vsn>\d+)$", re.I)
 
 
+REMOVABLE_BUSES = ("USB", "SD", "MMC", "IEEE 1394")
+
+
+def _virtual(*names) -> bool:
+    """Virtual machine hardware (VMware, VirtualBox, Hyper-V, QEMU, ...), judged by vendor, product or device path."""
+    text = " ".join(str(n or "") for n in names).lower().replace("_", " ")
+    return any(v in text for v in VIRTUAL_VENDORS) or "necvmwar" in text
+
+
 def _prop_time(inst_key, prop: str):
     for path in (f"Properties\\{DEVPROP}\\{prop}", f"Properties\\{DEVPROP.upper()}\\{prop}"):
         try:
@@ -158,7 +167,7 @@ class UsbModule(ArtifactModule):
                         serial = info.get("serial") or inst.name
                         container = str(val(inst, "ContainerID") or "").lower()
                         if enum_name == "SCSI" and (not container or container == NULL_CONTAINER
-                                                    or (info.get("vendor") or "").lower().startswith(VIRTUAL_VENDORS)):
+                                                    or _virtual(info.get("vendor"), info.get("product"))):
                             continue  # internal / virtual SCSI disk; USB attached SCSI (UAS) devices carry a real container id
                         friendly = val(inst, "FriendlyName") or val(inst, "DeviceDesc") or ""
                         friendly = friendly.split(";")[-1] if isinstance(friendly, str) else str(friendly)
@@ -319,7 +328,8 @@ class UsbModule(ArtifactModule):
                                               "serial": serial, "external": external},
                      summary=f"{name} -> {dev[:120]}", source="SYSTEM\\MountedDevices")
             n += 1
-            if serial:
+            # only removable device paths become devices (an optical drive or a virtual disk is not removable storage)
+            if serial and re.search(r"usbstor|wpdbusenum|sdbus|#sd#|removablemedia", dev, re.I) and not _virtual(dev):
                 fields = {"sources": {"MountedDevices"}}
                 m = re.match(r"\\DosDevices\\([A-Z]:)", name, re.I)
                 if m:
@@ -368,6 +378,9 @@ class UsbModule(ArtifactModule):
                 fields = {"sources": {"Windows Portable Devices"}}
                 if fn and re.fullmatch(r"[A-Z]:\\?", fn, re.I):
                     fields["drive_letters"] = {fn[0].upper() + ":"}
+                elif fn and "usbstor" in e.name.lower():
+                    # a USB storage volume: the friendly name is its volume label; vendor / product are in the device path
+                    fields.update(volume_labels={fn}, vendor=info.get("vendor"), product=info.get("product"))
                 elif fn:
                     fields["volume_labels"] = {fn} if serial_key(info["serial"]) in self.dev else set()
                     if serial_key(info["serial"]) not in self.dev:
@@ -491,9 +504,15 @@ class UsbModule(ArtifactModule):
                 fields["capacity"] = d["capacity"]
             if d.get("bus_type"):
                 fields["bus_type"] = d["bus_type"]
+            if _virtual(d.get("vendor"), d.get("product")) or (d.get("bus_type") and d["bus_type"] not in REMOVABLE_BUSES):
+                continue  # virtual machine disks / controllers and fixed disks (NVMe, SATA, SAS, ...) are not removable media
             if key not in self.dev:
-                # event-only devices: keep storage devices (bus type from Partition/Storsvc or a USBSTOR id), not hubs / HID
-                if d.get("bus_type") not in ("USB", "SD", "MMC", "IEEE 1394") and not (d.get("vendor") and d.get("product")):
+                # event-only devices: keep removable storage (USB / SD bus, or a USBSTOR / portable-device instance id),
+                # not hubs, HID devices or internal disks
+                inst = (d.get("details") or "").split(" ")[0].upper()
+                removable = d.get("bus_type") in REMOVABLE_BUSES or inst.startswith(("USBSTOR\\", "SWD\\WPDBUSENUM\\", "SD\\", "SDBUS\\")) \
+                    or (inst.startswith("USB\\") and "usbstor" in (d.get("details") or "").lower())
+                if not removable:
                     continue
             dev = self._device(serial, first_seen=ts, last_seen=ts, **fields)
             if d.get("event") == "connected" or d.get("event_id") in (2003,):

@@ -16,7 +16,7 @@ ClickFix, remote-access / RMM abuse, ransomware and account compromise.
 [![Validated: NIST CFReDS](https://img.shields.io/badge/validated-NIST%20CFReDS-2E7D32)](docs/VALIDATION.md)
 
 [Download](https://github.com/sujayadkesar/windows-forensic-automation/releases) · [Quick start](#quick-start) · [Case types](#case-types) ·
-[Validation](#validated-against-a-published-answer-key) · [Sample report](docs/sample-report) · [Contributing](CONTRIBUTING.md)
+[Validation](#validated-against-published-answer-keys) · [Sample report](docs/sample-report) · [Contributing](CONTRIBUTING.md)
 
 <img src="docs/images/dashboard.png" alt="Case dashboard: investigative questions with conclusions" width="900">
 
@@ -36,7 +36,7 @@ Commercial suites answer this well but cost more than many teams, schools and in
 
 **Windows Forensic Automation** does that examination end to end:
 
-1. **Parses** 95 Windows artifact types from E01 / Ex01 / raw / VMDK / VHD(X) images, deleted records included.
+1. **Parses** 96 Windows artifact types (Windows XP to 11, Server 2003 to 2022) from E01 / Ex01 / raw / VMDK / VHD(X) images, deleted records included.
 2. **Searches every byte** of the disk. Each hit is attributed to allocated file, slack, unallocated space, `$MFT`, `$LogFile`, `$UsnJrnl`, `$I30`, pagefile, hiberfil, Volume Shadow Copy or unpartitioned space.
 3. **Answers the investigative questions** of the case type you chose. Each answer is **Yes / Indicated / No evidence found / Not applicable / Inconclusive** and cites its artifacts.
 4. **Writes the report.** You get Word, PDF and Excel, with annotated, screenshot-style figures of the actual records.
@@ -47,7 +47,8 @@ Commercial suites answer this well but cost more than many teams, schools and in
 
    You can check any result by hand or in your tool of choice.
 
-> Forensic output is only useful if it is right. The tool is validated against the NIST CFReDS answer key, and its figures
+> Forensic output is only useful if it is right. The tool is validated against published answer keys (NIST CFReDS, DFIR
+> Madness) and ground-truth threat scenarios, and its figures
 > never contain values that are not in the evidence. See [Accuracy first](#accuracy-first).
 
 ## Case types
@@ -66,25 +67,33 @@ Commercial suites answer this well but cost more than many teams, schools and in
 
 Profiles are YAML files. [Add your own](CONTRIBUTING.md#1-profiles-case-types) without writing code.
 
-## Validated against a published answer key
+## Validated against published answer keys
 
-The NIST [CFReDS Data Leakage Case](https://cfreds-archive.nist.gov/data_leakage_case/) is a public Windows 7 image of an
-employee who leaks confidential files by USB, cloud, e-mail and CD-R and then wipes traces. NIST publishes the answers.
-`tests/validation` checks the tool's output against them:
+Every result is checked value by value against public cases whose answers are published, and against threat scenarios
+built with exact ground truth. Each case was processed blind: no file list, device serial or indicator was supplied.
 
-| NIST question | What is checked | Result |
-|---|---|---|
-| Q3-Q9 | OS, time zone, computer name, accounts and logon counts, last logon, IP address | ✅ |
-| Q10, Q16, Q17 | Installed applications, all web search keywords, Explorer search "secret" | ✅ |
-| Q22 | Both USB sticks, serials, first connection times, connection after reboot, volume label `IAMAN $_@` | ✅ |
-| Q24-Q28 | Network share `\\10.11.11.128\secured_drive`, folders traversed and files opened on RM#2 and the share | ✅ |
-| Q29-Q31 | Google Drive account, uploaded and deleted files with times | ✅ |
-| Q32-Q35 | CD burning: 4 burn times (cdrom event 133), method, every file staged for the disc, files opened from the CD | ✅ |
-| Q21, Q45 | E-mails including deleted ones and the attachment `space_and_earth.mp4` (Windows Search index) | ✅ |
-| Q23, Q36, Q37 | `$UsnJrnl` paths of renamed / deleted files, resignation letter timestamps, XPS print | ✅ |
-| Q52 | Eraser wiping `Desktop\temp` (7 random renames, then delete) | ✅ |
+| Reference case | System | Storyline | Checks |
+|---|---|---|---|
+| [NIST CFReDS Data Leakage](https://cfreds-archive.nist.gov/data_leakage_case/) | Windows 7 | Insider leaks files by USB, network share, e-mail, Google Drive and CD-R, then wipes traces | ✅ 24 / 24 |
+| [NIST CFReDS Hacking Case](https://cfreds-archive.nist.gov/) | Windows XP | Abandoned laptop with wireless sniffing and password-cracking tools | ✅ 20 / 20 |
+| [DFIR Madness: The Stolen Szechuan Sauce](https://dfirmadness.com/case001/) | Server 2012 R2 DC + Windows 10 | RDP brute force, Meterpreter, service + registry persistence, lateral movement, data theft, timestomping | ✅ 19 / 19 |
+| [Digital Corpora M57-Jean](https://digitalcorpora.org/corpora/scenarios/m57-jean/) | Windows XP | Salary spreadsheet e-mailed to an impostor whose display name was a colleague's address | ✅ 5 / 5 |
+| Synthetic threat scenarios | Windows 10 / 11, Server 2019 | ClickFix, phishing macro, AnyDesk scam, RDP brute force + ransomware, and a busy **clean** PC that must stay clean | ✅ 35 / 35 |
 
-Details and how to reproduce: [docs/VALIDATION.md](docs/VALIDATION.md).
+Examples of what is checked:
+- **CFReDS:** both USB serials and connection times, every web search, the network share, Google Drive uploads and
+  deletions, the four CD burns, deleted e-mails from the search index, and the Eraser wipe.
+- **Szechuan:** the brute force linked to `194.61.24.102`, the `coreupdater` download from that address, its service and
+  Run-key persistence on both systems, DC → desktop lateral movement, `Secret.zip` / `loot.zip`, and the timestomped
+  `Beth_Secret.txt`. The case also showed that both systems' clocks run one hour ahead of the published capture times;
+  the tool reports what the disks record.
+- **M57-Jean:** the reply carrying `m57biz.xls` went to `tuckgorge@gmail.com` behind the display name
+  `alison@m57.biz`; the attachment is byte-identical to the file on Jean's Desktop.
+- **Clean control:** OneDrive, Teams, Zoom, Slack and VS Code in AppData, vendor installers, updater tasks, admin
+  PowerShell and genuine Microsoft / Google / GitHub sign-ins. All of it produces **no** threat finding.
+
+Every false positive these cases exposed was fixed in the code, not in the test. Details, the fixes and how to reproduce
+(`python -m tests.validation.datasets` downloads the images): [docs/VALIDATION.md](docs/VALIDATION.md).
 
 ## Accuracy first
 
@@ -162,19 +171,19 @@ wfa-cli profiles
 └── exports\     files of interest, carved files, keyword hit context
 ```
 
-## What it examines (Windows 7 - 11)
+## What it examines (Windows XP - 11, Server 2003 - 2022)
 
 | Area | Artifacts |
 |---|---|
 | File system | `$MFT` incl. deleted records, `$SI` / `$FN` timestamps and anomalies, ADS / Zone.Identifier, `$UsnJrnl` (sequence-checked paths, wiper patterns), FAT / exFAT incl. deleted entries |
 | Removable media | USBSTOR / SCSI / WPD, Properties 0064 / 0066 / 0067, DeviceClasses, MountedDevices, MountPoints2, VolumeInfoCache, EMDMgmt, setupapi, Partition/Diagnostic, Kernel-PnP, UserPnp |
 | Optical media | `cdrom` event 133, IMAPI sessions and burn staging files (MFT + `$UsnJrnl`), CD Burning registry, `<CDBURN>` shellbags, shortcuts to discs |
-| File and folder access | LNK, jump lists, shellbags, RecentDocs, Open/Save and LastVisited MRU, Office MRU, TypedPaths, WordWheelQuery, Windows Timeline, IE / WinInet `file:///` history, Recycle Bin |
-| Execution | Prefetch, Amcache, Shimcache, BAM/DAM, UserAssist, MUICache, PCA, SRUM, process-creation events |
+| File and folder access | LNK, jump lists, shellbags, RecentDocs, Open/Save and LastVisited MRU, Office MRU, TypedPaths, WordWheelQuery, Windows Timeline, IE / WinInet `file:///` history, Recycle Bin (`$I` / `$R` and XP `INFO2`) |
+| Execution | Prefetch (all versions, full paths), Amcache, Shimcache, BAM/DAM, UserAssist, MUICache, PCA, SRUM, process-creation events, hacking / dual-use tool identification |
 | Browsers | Chrome / Edge / Brave / Opera / Vivaldi, Firefox, Internet Explorer and Edge legacy (`WebCacheV01.dat`, `index.dat`) |
-| E-mail, cloud, notes | Outlook PST / OST, Windows Search index (`Windows.edb`), OneDrive, Google Drive (DriveFS and the legacy client), Dropbox, Box, MEGA, Sticky Notes |
-| Event logs | 39 channels, full CSV dumps, PowerShell script-block reassembly, chunk-level recovery of damaged EVTX |
-| Persistence and remote access | Run keys, services, scheduled tasks, WMI subscriptions, startup folders, RMM tools, RDP |
+| E-mail, cloud, notes | Outlook PST / OST, mail and news account settings, Windows Search index (`Windows.edb`), OneDrive, Google Drive (DriveFS and the legacy client), Dropbox, Box, MEGA, Sticky Notes |
+| Event logs | 39 EVTX channels and Windows XP / 2003 `.evt` logs, full CSV dumps, PowerShell script-block reassembly, chunk-level recovery of damaged EVTX |
+| Persistence and remote access | Run keys, services, scheduled tasks, WMI subscriptions, startup folders, RMM tools, RDP, brute force, lateral movement between examined systems |
 | Raw data | Keyword search of every byte (ASCII / UTF-16LE) with area attribution, carving of documents, archives, databases, shortcuts and executables, pagefile / hiberfil strings |
 
 ## Architecture
@@ -182,7 +191,7 @@ wfa-cli profiles
 ```mermaid
 flowchart LR
     A[Evidence<br>E01 / raw / VMDK / VHDX] --> B[Engine<br>one process per image]
-    B --> C[23 artifact modules<br>95 artifact types]
+    B --> C[23 artifact modules<br>96 artifact types]
     B --> D[Physical search<br>+ carving]
     C --> E[(Case database<br>SQLite)]
     D --> E
@@ -208,7 +217,7 @@ If you find a result that is not in the evidence, please open a **Wrong result**
 - Thumbcache, Windows 11 Search (`Windows.db`), Windows Timeline (`ActivitiesCache.db`) enrichment.
 - Linux / macOS triage profiles.
 - Memory image support (Volatility 3 integration).
-- More validation against public reference images.
+- More public reference cases (Magnet / DFIR community CTF images).
 
 ## License
 

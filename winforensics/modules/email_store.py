@@ -32,6 +32,36 @@ def _entry(item, entry_type: int):
     return None
 
 
+def _recipients(m) -> dict[int, list[str]]:
+    """Recipient table of a message: {1: To, 2: Cc, 3: Bcc} -> ["display <address>"].  The display name and the address
+    can differ ("alison@m57.biz <tuckgorge@gmail.com>"): the address is where the message went.  Bcc recipients exist
+    only here."""
+    out: dict[int, list[str]] = {1: [], 2: [], 3: []}
+    try:
+        rec = m.recipients
+        sets = rec.record_sets if rec is not None else []
+    except Exception:
+        return out
+    for rs in sets:
+        vals = {}
+        for e in rs.entries:
+            try:
+                if e.entry_type in (0x3001, 0x3003, 0x39FE, 0x5FF6):
+                    vals[e.entry_type] = e.data_as_string or ""
+                elif e.entry_type == 0x0C15:
+                    vals[e.entry_type] = e.data_as_integer
+            except Exception:
+                continue
+        addr = vals.get(0x39FE) or vals.get(0x3003) or ""
+        if addr.upper().startswith("/O="):  # Exchange legacy DN: only the SMTP property is an address
+            addr = vals.get(0x39FE) or ""
+        name = vals.get(0x3001) or vals.get(0x5FF6) or ""
+        text = f"{name} <{addr}>" if name and addr and name.strip("'\" ").lower() != addr.lower() else (addr or name)
+        if text:
+            out.setdefault(vals.get(0x0C15) or 1, []).append(text)
+    return out
+
+
 def _hdr(headers: str, name: str) -> str:
     if not headers:
         return ""
@@ -53,11 +83,13 @@ class EmailModule(ArtifactModule):
     artifact_types = [
         ArtifactType("email_message", "E-mail Messages", "Email",
                      [C("time", kind="datetime"), C("folder", width=160), C("sender", width=220), C("to", width=240),
+                      C("cc", "Cc", width=180), C("bcc", "Bcc", width=180), C("reply_to", "Reply-To", width=180),
                       C("subject", width=320), C("attachments", kind="int"), C("attachment_names", width=300),
                       C("store", width=260)], ts_label="Sent / received"),
         ArtifactType("email_attachment", "E-mail Attachments", "Email",
                      [C("time", kind="datetime"), C("filename", width=260), C("size", kind="size"), C("sha256", "SHA256", "hash", 300),
-                      C("md5", "MD5", "hash", 240), C("sender", width=200), C("to", width=220), C("subject", width=260),
+                      C("md5", "MD5", "hash", 240), C("local_copies", "Identical file on this system", "path", 320),
+                      C("sender", width=200), C("to", width=220), C("subject", width=260),
                       C("folder"), C("store", width=240)], ts_label="Message time"),
     ]
 
@@ -140,8 +172,10 @@ class EmailModule(ArtifactModule):
                 sender = f"{sender} (Exchange mailbox)" if sender else "(Exchange mailbox)"
         if addr and addr not in sender:
             sender = f"{sender} <{addr}>" if sender else addr
-        to = _hdr(headers, "To") or _entry(m, PR_DISPLAY_TO) or ""
-        cc = _hdr(headers, "Cc") or _entry(m, PR_DISPLAY_CC) or ""
+        rcpt = _recipients(m)
+        to = ", ".join(rcpt[1]) or _hdr(headers, "To") or _entry(m, PR_DISPLAY_TO) or ""
+        cc = ", ".join(rcpt[2]) or _hdr(headers, "Cc") or _entry(m, PR_DISPLAY_CC) or ""
+        bcc = ", ".join(rcpt[3])
         ts = m.delivery_time or m.client_submit_time or m.creation_time
         atts = []
         for i in range(m.number_of_attachments):
@@ -154,7 +188,8 @@ class EmailModule(ArtifactModule):
                     a.seek_offset(0)
                     data = a.read_buffer(size)
                     md5, sha = hashlib.md5(data).hexdigest(), hashlib.sha256(data).hexdigest()
-                atts.append({"filename": fname, "size": size, "md5": md5, "sha256": sha})
+                atts.append({"filename": fname, "size": size, "md5": md5, "sha256": sha,
+                             "local_copies": self._local_copies(ctx, fname, size, sha)})
             except Exception:
                 continue
         body = ""
@@ -162,7 +197,8 @@ class EmailModule(ArtifactModule):
             body = (m.plain_text_body or b"")[:2000].decode("utf-8", "replace") if isinstance(m.plain_text_body, bytes) else str(m.plain_text_body or "")[:2000]
         except Exception:
             pass
-        rec = {"time": db_ts(ts), "folder": folder, "sender": sender, "to": to, "cc": cc, "subject": m.subject or "",
+        rec = {"time": db_ts(ts), "folder": folder, "sender": sender, "to": to, "cc": cc, "bcc": bcc, "subject": m.subject or "",
+               "reply_to": _hdr(headers, "Reply-To"),
                "attachments": len(atts), "attachment_names": ", ".join(a["filename"] for a in atts), "store": store,
                "attachment_list": atts, "message_id": _hdr(headers, "Message-ID"), "body_preview": body[:500]}
         ctx.emit("email_message", ts, rec, user=user, summary=f"[{folder}] {m.subject or ''} from {sender} to {to}"[:300],
@@ -172,6 +208,20 @@ class EmailModule(ArtifactModule):
                                               "folder": folder, "store": store},
                      user=user, summary=f"Attachment {a['filename']} ({a['size']} bytes) in '{m.subject or ''}'", source=store,
                      ts_label="Message time")
+
+    @staticmethod
+    def _local_copies(ctx, fname, size, sha) -> str:
+        """Files on the system that are byte-identical to an attachment (same name and size, then SHA-256)."""
+        if not (sha and fname and size):
+            return ""
+        out = []
+        for r in ctx.fs_files("lower(name)=? AND size=?", (fname.lower(), size), include_deleted=True, limit=10):
+            try:
+                if hashlib.sha256(ctx.read_entry(r, MAX_ATTACH)).hexdigest() == sha:
+                    out.append(ctx.display_path(r["volume"], r["path"]) + (" (deleted)" if r.get("deleted") else ""))
+            except Exception:
+                continue
+        return " | ".join(out)
 
     # ------------------------------------------------------------------ eml / msg
     def _single(self, ctx, row) -> int:

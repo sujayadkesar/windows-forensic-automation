@@ -258,7 +258,11 @@ class FilesystemModule(ArtifactModule):
             if si_t[0] and fn_t[0] and not is_dir:
                 if si_t[0] < fn_t[0] - timedelta(seconds=2):
                     flags.append("si_created_before_fn")
-                    anomalies.append((seg, "$SI created earlier than $FN created (possible timestomping)", si_t, fn_t))
+                    # whole-second $SI values next to precise $FN values: written by a timestamp tool (timestomp,
+                    # SetFileTime with a typed date); copies, cross-volume moves and installers keep the precision
+                    whole = si is not None and _zero_fraction(si) and not _zero_fraction(fn_attr)
+                    anomalies.append((seg, TIMESTOMP_STRONG if whole else "$SI created earlier than $FN created (possible timestomping)",
+                                      si_t, fn_t))
                 elif si is not None and _zero_fraction(si) and not _zero_fraction(fn_attr) and inuse:
                     flags.append("si_zero_fraction")
                     anomalies.append((seg, "$SI timestamps have zero sub-second precision while $FN do not", si_t, fn_t))
@@ -539,6 +543,7 @@ def _interesting_path(path: str) -> bool:
 
 
 UNKNOWN_DIR = "<unknown folder: MFT record {seg}, sequence {seq}>"
+TIMESTOMP_STRONG = "$SI created earlier than $FN created and $SI times have no sub-second part (typical of timestamp tools)"
 
 
 def _parent_ok(pseg: int, pseq: int, seqs: dict, inuse: dict) -> bool:

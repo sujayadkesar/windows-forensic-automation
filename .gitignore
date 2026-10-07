@@ -17,6 +17,9 @@ packaging/build/
 # Synthetic test images are generated locally (python tests/fixtures/build_all.py) - too large for git
 test_data/evidence/
 test_data/staging/
+# threat scenario images (python -m tests.fixtures.build_threats)
+test_data/scenarios/
+test_data/staging_threats/
 
 # Never commit case data or evidence
 *.E01

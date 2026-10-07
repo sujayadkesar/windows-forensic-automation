@@ -6,10 +6,10 @@ from datetime import timedelta
 
 from ..core.timeutil import from_db
 from .base import Analyzer, analyzer, table_figure, timeline_figure
-from .common import short
+from .common import eqid, short
 
-CORE = [("evt_logon", lambda d: d.get("event_id") in (4647, 4800, 4801, 7001, 7002) or
-         (d.get("event_id") in (4624, 4634) and (d.get("logon_type") or "").split(" ")[0] in ("2", "7", "10", "11")), "Logon"),
+CORE = [("evt_logon", lambda d: eqid(d) in (4647, 4800, 4801, 7001, 7002) or
+         (eqid(d) in (4624, 4634) and (d.get("logon_type") or "").split(" ")[0] in ("2", "7", "10", "11")), "Logon"),
         ("evt_system", lambda d: True, "System"), ("evt_rdp", lambda d: True, "Remote session"),
         ("prefetch", lambda d: not d.get("is_previous_run"), "Program run"), ("userassist", lambda d: True, "Program run (GUI)"),
         ("web_search", lambda d: True, "Web search"), ("recent_doc", lambda d: True, "Document opened"),

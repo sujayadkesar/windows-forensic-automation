@@ -91,12 +91,20 @@ class UserActivityModule(ArtifactModule):
                      [C("path", kind="path", width=460), C("type"), C("last_interacted", "Key Last Written", "datetime"),
                       C("folder_modified", kind="datetime"), C("folder_created", kind="datetime"),
                       C("folder_accessed", kind="datetime"), C("hive", width=200)], ts_label="Key last written"),
+        ArtifactType("email_account", "E-mail / News Accounts (mail client settings)", "E-mail",
+                     [C("email", "E-mail Address", width=220), C("display_name"), C("account_name", width=200),
+                      C("incoming_server", width=200), C("smtp_server", "SMTP Server", width=180),
+                      C("nntp_server", "NNTP (news) Server", width=180), C("user_name", width=200), C("password_saved"),
+                      C("client", width=200), C("key_modified", kind="datetime")], ts_label="Key last written",
+                     description="Accounts configured in Outlook Express / Windows Mail / Outlook (registry). Saved "
+                                 "passwords are only flagged, never decoded."),
     ]
 
     def run(self, ctx) -> None:
         reg = ctx.target.registry
         steps = [self._recentdocs, self._opensave, self._lastvisited, self._runmru, self._typedpaths, self._wordwheel,
-                 self._userassist, self._office, self._trusted, self._typedurls, self._mstsc, self._netdrives, self._shellbags]
+                 self._userassist, self._office, self._trusted, self._typedurls, self._mstsc, self._netdrives, self._shellbags,
+                 self._mail_accounts]
         for i, fn in enumerate(steps):
             try:
                 fn(ctx, reg)
@@ -104,6 +112,78 @@ class UserActivityModule(ArtifactModule):
                 ctx.warn(f"user_activity {fn.__name__}: {e}")
                 ctx.coverage(fn.__name__.strip("_"), "registry", "error", 0, str(e)[:200])
             ctx.progress((i + 1) / len(steps))
+
+    # ------------------------------------------------------------------ mail client accounts
+    def _mail_accounts(self, ctx, reg) -> None:
+        """Internet Account Manager (Outlook Express, Outlook 2002/2003, Windows Mail) and Outlook profile accounts
+        (Outlook 2007+, values stored as UTF-16 binary)."""
+        def text(v):
+            if isinstance(v, (bytes, bytearray)):
+                return bytes(v).decode("utf-16-le", "ignore").split("\x00")[0] if len(v) % 2 == 0 else ""
+            return "" if v is None else str(v)
+
+        n = 0
+        sources = [("HKCU\\Software\\Microsoft\\Internet Account Manager\\Accounts", "Outlook Express / Internet Account Manager"),
+                   ("HKCU\\Software\\Microsoft\\Windows Mail\\Accounts", "Windows Mail")]
+        for path, client in sources:
+            for k in iter_keys(reg, path):
+                user = key_user(reg, k)
+                for acc in subkeys(k):
+                    v = {x.name: x.value for x in values(acc)}
+                    email = text(v.get("SMTP Email Address") or v.get("NNTP Email Address") or v.get("POP3 User Name")
+                                 or v.get("IMAP User Name") or v.get("HTTPMail User Name"))
+                    servers = {s: text(v.get(f"{s} Server")) for s in ("POP3", "IMAP", "HTTPMail", "SMTP", "NNTP")}
+                    if not (email or any(servers[s] for s in ("POP3", "IMAP", "HTTPMail", "NNTP"))):
+                        continue  # directory (LDAP) services and empty entries
+                    self._emit_account(ctx, acc, user, client, path, email=email,
+                                       display_name=text(v.get("SMTP Display Name") or v.get("NNTP Display Name")),
+                                       account_name=text(v.get("Account Name")),
+                                       incoming_server=servers["POP3"] or servers["IMAP"] or servers["HTTPMail"],
+                                       smtp_server=servers["SMTP"], nntp_server=servers["NNTP"],
+                                       user_name=text(v.get("POP3 User Name") or v.get("IMAP User Name") or
+                                                      v.get("NNTP User Name") or v.get("HTTPMail User Name")),
+                                       password_saved="Yes" if any(x.endswith(("Password", "Password2")) for x in v) else "")
+                    n += 1
+        for k in iter_keys(reg, "HKCU\\Software\\Microsoft\\Office"):
+            user = key_user(reg, k)
+            for ver in subkeys(k):
+                try:
+                    profiles = ver.subkey("Outlook").subkey("Profiles")
+                except Exception:
+                    continue
+                for prof in subkeys(profiles):
+                    try:
+                        accounts = prof.subkey("9375CFF0413111d3B88A00104B2A6676")
+                    except Exception:
+                        continue
+                    for acc in subkeys(accounts):
+                        v = {x.name: x.value for x in values(acc)}
+                        svc = text(v.get("Service Name")).upper()
+                        if svc in ("CONTAB", "EMABLT", "MSPST MS", "MSUPST MS"):
+                            continue  # address books and data files, not mail accounts
+                        name = text(v.get("Account Name"))
+                        email = text(v.get("Email") or v.get("SMTP Email Address")) or (name if "@" in name else "")
+                        servers = [text(v.get(s)) for s in ("IMAP Server", "POP3 Server", "SMTP Server")]
+                        if not email and not any(servers):
+                            continue
+                        kind = " - Exchange" if svc == "MSEMS" else ""
+                        self._emit_account(ctx, acc, user, f"Outlook {ver.name} (profile {prof.name}){kind}",
+                                           f"HKCU\\Software\\Microsoft\\Office\\{ver.name}\\Outlook\\Profiles\\{prof.name}",
+                                           email=email, display_name=text(v.get("Display Name")),
+                                           account_name=text(v.get("Account Name")),
+                                           incoming_server=text(v.get("IMAP Server") or v.get("POP3 Server")),
+                                           smtp_server=text(v.get("SMTP Server")), nntp_server="",
+                                           user_name=text(v.get("IMAP User") or v.get("POP3 User")),
+                                           password_saved="Yes" if any("password" in x.lower() for x in v) else "")
+                        n += 1
+        ctx.coverage("E-mail / news accounts", "NTUSER\\...\\Internet Account Manager, Windows Mail, Outlook profiles",
+                     "found" if n else "not_found", n)
+
+    def _emit_account(self, ctx, key, user, client, path, **rec) -> None:
+        ts = ts_of(key)
+        rec.update(client=client, key_modified=db_ts(ts))
+        ctx.emit("email_account", ts, rec, user=user, summary=f"{client}: {rec.get('email') or rec.get('account_name')}",
+                 source=f"NTUSER\\{path.split(chr(92), 1)[-1]}\\{key.name}", ts_label="Key last written")
 
     # ------------------------------------------------------------------ dissect backed MRUs
     def _recentdocs(self, ctx, reg) -> None:
@@ -305,6 +385,8 @@ class UserActivityModule(ArtifactModule):
                         ts = filetime(struct.unpack_from("<Q", data, 0)[0])
                         macros = struct.unpack_from("<I", data, len(data) - 4)[0] == 0x7FFFFFFF
                         path = _expand_known(v.name).replace("%USERPROFILE%", f"C:\\Users\\{user}" if user else "%USERPROFILE%")
+                        if "://" not in path:  # local paths are stored with forward slashes; URLs (SharePoint) stay as they are
+                            path = path.replace("/", "\\")
                         ctx.emit("trusted_doc", ts, {"path": path, "application": app.name, "trusted_time": db_ts(ts),
                                                      "macros_enabled": "Yes" if macros else "No"},
                                  user=user, summary=f"Trusted document ({app.name}): {path}" + (" [macros enabled]" if macros else ""),

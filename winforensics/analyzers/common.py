@@ -26,6 +26,29 @@ def basename(p: str) -> str:
     return re.split(r"[\\/]", str(p or ""))[-1]
 
 
+_RX_MAIL = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
+
+
+def sender_impersonation(sender) -> tuple[str, str] | None:
+    """(address shown in the display name, real sender address) when the display name of a sender is itself an e-mail
+    address that is not the address the message came from: 'alison@m57.biz <tuckgorge@gmail.com>'."""
+    s = str(sender or "")
+    if "<" not in s:
+        return None
+    display, real_part = s.split("<", 1)
+    shown = [a.lower() for a in _RX_MAIL.findall(display)]
+    real = _RX_MAIL.findall(real_part)
+    if not shown or not real:
+        return None
+    real_addr = real[0].lower()
+    return (shown[0], real_addr) if real_addr not in shown else None
+
+
+def eqid(d: dict):
+    """Event ID in Vista+ terms: Windows XP / 2003 events (528, 529, 624, ...) carry their modern equivalent."""
+    return d.get("equivalent_id") or d.get("event_id")
+
+
 def targets(actx) -> list[dict]:
     return actx.inputs.get("targets") or []
 
@@ -139,3 +162,29 @@ def fmt_size(n) -> str:
             return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
         n /= 1024
     return str(n)
+
+
+# --------------------------------------------------------------------------- paths of programs
+from ..core.paths import app_root, command_paths, norm_path  # noqa: E402,F401  (re-exported for analyzers)
+
+
+def installed_roots(actx, evidence_id) -> set[str]:
+    """Application folders of every registered installed program (machine and per-user Uninstall keys): install
+    location, uninstaller and icon paths, reduced to the application's top folder."""
+    key = f"_roots_{evidence_id}"
+    if key not in actx.cache:
+        roots = set()
+        for a in actx.artifacts("installed_program", evidence_id):
+            d = a["data"]
+            paths = [str(d.get("install_location") or "").strip().strip('"').rstrip("\\") + "\\x"] if d.get("install_location") else []
+            for v in (d.get("display_icon"), d.get("uninstall")):
+                if v and not str(v).lower().lstrip('"').startswith("msiexec"):
+                    paths += command_paths(str(v).split(",")[0])[:1]
+            roots |= {r for r in map(app_root, paths) if r}
+        actx.cache[key] = roots
+    return actx.cache[key]
+
+
+def in_installed_program(actx, evidence_id, path) -> bool:
+    p = norm_path(path)
+    return any(p == r or p.startswith(r + "\\") for r in installed_roots(actx, evidence_id))

@@ -32,7 +32,8 @@ class ExecutionModule(ArtifactModule):
                  "UsrClass.dat\\...\\Shell\\MuiCache"]
     artifact_types = [
         ArtifactType("prefetch", "Prefetch", "Program Execution",
-                     [C("executable", width=200), C("run_count", kind="int"), C("last_run", kind="datetime"),
+                     [C("executable", width=200), C("path", "Executable path (from the file list)", "path", width=380),
+                      C("run_count", kind="int"), C("last_run", kind="datetime"),
                       C("previous_runs", width=300), C("files_referenced", "Files", "int"), C("volumes", width=260),
                       C("prefetch_file", width=220), C("tools")], ts_label="Last run"),
         ArtifactType("prefetch_file_ref", "Prefetch - files referenced", "Program Execution",
@@ -106,7 +107,18 @@ class ExecutionModule(ArtifactModule):
     def _one_prefetch(self, ctx, p, Prefetch, c_prefetch):
         pf = Prefetch(io.BytesIO(ctx.read_bytes(p)))
         exe = pf.header.name.decode("utf-16-le", "ignore").split("\x00")[0]
-        runs = [t for t in [pf.latest_timestamp, *pf.previous_timestamps] if t and db_ts(t)]
+        run_count = pf.fn.run_count
+        if pf.version in (17, 23):
+            # Windows XP / 2003 (17) and Vista / 7 (23) record one last-run FILETIME and the run count at fixed offsets
+            # (libscca format): 17 -> 0x78 / 0x90, 23 -> 0x80 / 0x98.  dissect's version-17 layout reads both from the
+            # wrong place, and the bytes after the version-23 time are not earlier run times.
+            pf.fh.seek(0x78 if pf.version == 17 else 0x80)
+            last = struct.unpack("<Q", pf.fh.read(8))[0]
+            pf.fh.seek(0x90 if pf.version == 17 else 0x98)
+            run_count = struct.unpack("<I", pf.fh.read(4))[0]
+            runs = [t for t in [filetime(last) if last else None] if t and db_ts(t)]
+        else:
+            runs = [t for t in [pf.latest_timestamp, *pf.previous_timestamps] if t and db_ts(t)]
         vols = []
         try:
             vol_struct = c_prefetch.VOLUME_INFORMATION_30 if pf.version >= 30 else c_prefetch.VOLUME_INFORMATION_17
@@ -122,15 +134,20 @@ class ExecutionModule(ArtifactModule):
             pass
         metrics = list(pf.metrics or [])
         vol_serials = {m.group(2).upper() for f in metrics for m in [RX_VOLPATH.match(f)] if m}
+        # the header keeps only the file name (truncated to 29 characters); the executable's full path is the
+        # entry of the referenced-file list with that name
+        low = exe.lower()
+        path = next((f for f in metrics if f.lower().rsplit("\\", 1)[-1] == low), "") or \
+            (next((f for f in metrics if f.lower().rsplit("\\", 1)[-1].startswith(low)), "") if len(exe) >= 29 else "")
         rec = {
-            "executable": exe, "hash": f"{pf.header.hash:08X}", "version": pf.version, "run_count": pf.fn.run_count,
+            "executable": exe, "path": path, "hash": f"{pf.header.hash:08X}", "version": pf.version, "run_count": run_count,
             "last_run": db_ts(runs[0]) if runs else None, "run_times": [db_ts(t) for t in runs],
             "previous_runs": ", ".join((db_ts(t) or "")[:19] for t in runs[1:] if db_ts(t)), "files_referenced": len(metrics),
             "volumes": ", ".join(f"{v['device']} ({v['serial'][:4]}-{v['serial'][4:]})" for v in vols),
             "volume_list": vols, "volume_serials_in_paths": sorted(vol_serials), "prefetch_file": p.name,
             "files": metrics[:2000], "tools": ", ".join(t for _, t in tool_for_exe(exe)),
         }
-        ctx.emit("prefetch", runs[0] if runs else None, rec, summary=f"{exe} ran {pf.fn.run_count}x, last {rec['last_run']}",
+        ctx.emit("prefetch", runs[0] if runs else None, rec, summary=f"{exe} ran {run_count}x, last {rec['last_run']}",
                  source=f"C:\\Windows\\Prefetch\\{p.name}", ts_label="Last run", tags=_tool_tags(exe))
         for t in runs[1:]:
             ctx.emit("prefetch", t, {**rec, "files": [], "is_previous_run": True},

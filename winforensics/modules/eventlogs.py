@@ -213,6 +213,63 @@ CATALOG: dict[str, dict[int, tuple[str, str]]] = {
 
 _CHANNEL_ALIASES = {"microsoft-windows-vhdmp-operational": "microsoft-windows-vhdmp/operational"}
 
+# Windows 2000 / XP / Server 2003 (.evt): records carry positional insertion strings only.  (log, event id) ->
+# (Vista+ equivalent id, description, names of the insertion strings in order).  Records keep their own event id; the
+# equivalent id lets the analyzers treat 528 like 4624.  Layouts follow the Windows Server 2003 security event
+# reference; older builds log a prefix of the same strings.
+_LOGON = ["TargetUserName", "TargetDomainName", "TargetLogonId", "LogonType", "LogonProcessName", "AuthenticationPackageName",
+          "WorkstationName", "LogonGuid", "SubjectUserName", "SubjectDomainName", "SubjectLogonId", "ProcessId",
+          "TransmittedServices", "IpAddress", "IpPort"]
+_FAILED = ["TargetUserName", "TargetDomainName", "LogonType", "LogonProcessName", "AuthenticationPackageName", "WorkstationName",
+           "SubjectUserName", "SubjectDomainName", "SubjectLogonId", "ProcessId", "TransmittedServices", "IpAddress", "IpPort"]
+_ACCT = ["TargetUserName", "TargetDomainName", "TargetSid", "SubjectUserName", "SubjectDomainName", "SubjectLogonId", "PrivilegeList"]
+_GROUP = ["MemberName", "MemberSid", "TargetUserName", "TargetDomainName", "TargetSid", "SubjectUserName", "SubjectDomainName",
+          "SubjectLogonId", "PrivilegeList"]
+_FAIL_REASON = {529: "Unknown user name or bad password", 530: "Outside logon hours", 531: "Account disabled",
+                532: "Account expired", 533: "Workstation restriction", 534: "Logon type not granted", 535: "Password expired",
+                536: "NetLogon component not active", 537: "Unexpected error during logon", 539: "Account locked out"}
+LEGACY: dict[tuple[str, int], tuple[int, str, list[str]]] = {
+    ("security", 528): (4624, "Successful logon", _LOGON),
+    ("security", 540): (4624, "Successful network logon", _LOGON),
+    **{("security", k): (4625, f"Failed logon - {v.lower()}", _FAILED) for k, v in _FAIL_REASON.items()},
+    ("security", 538): (4634, "Logoff", ["TargetUserName", "TargetDomainName", "TargetLogonId", "LogonType"]),
+    ("security", 551): (4647, "User initiated logoff", ["TargetUserName", "TargetDomainName", "TargetLogonId"]),
+    ("security", 552): (4648, "Logon with explicit credentials",
+                        ["SubjectUserName", "SubjectDomainName", "SubjectLogonId", "LogonGuid", "TargetUserName", "TargetDomainName",
+                         "TargetLogonGuid", "TargetServerName", "TargetInfo", "ProcessId", "IpAddress", "IpPort"]),
+    ("security", 592): (4688, "Process created",
+                        ["NewProcessId", "NewProcessName", "ProcessId", "SubjectUserName", "SubjectDomainName", "SubjectLogonId"]),
+    ("security", 601): (4697, "Service installed",
+                        ["ServiceFileName", "ServiceName", "ServiceType", "ServiceStartType", "ServiceAccount", "SubjectUserName",
+                         "SubjectDomainName", "SubjectLogonId"]),
+    ("security", 624): (4720, "User account created", _ACCT),
+    ("security", 626): (4722, "User account enabled", _ACCT),
+    ("security", 627): (4723, "Password change attempted", _ACCT),
+    ("security", 628): (4724, "Password reset", _ACCT),
+    ("security", 629): (4725, "User account disabled", _ACCT),
+    ("security", 630): (4726, "User account deleted", _ACCT),
+    ("security", 632): (4728, "Member added to global group", _GROUP),
+    ("security", 636): (4732, "Member added to local group", _GROUP),
+    ("security", 637): (4733, "Member removed from local group", _GROUP),
+    ("security", 660): (4756, "Member added to universal group", _GROUP),
+    ("security", 517): (1102, "Audit log cleared",
+                        ["PrimaryUserName", "PrimaryDomainName", "PrimaryLogonId", "SubjectUserName", "SubjectDomainName",
+                         "SubjectLogonId"]),
+    ("system", 6005): (6005, "Event log service started (boot)", []),
+    ("system", 6006): (6006, "Event log service stopped (shutdown)", []),
+    ("system", 6008): (6008, "Unexpected shutdown", []),
+    ("system", 6009): (6009, "OS version at boot", []),
+    ("system", 1074): (1074, "Shutdown / restart initiated", []),
+    ("application", 1000): (1000, "Application crash", []),
+    ("application", 1001): (1001, "Windows Error Reporting", []),
+    ("application", 1002): (1002, "Application hang", []),
+}
+_LEGACY_TYPE = {4624: "evt_logon", 4625: "evt_logon", 4634: "evt_logon", 4647: "evt_logon", 4648: "evt_logon",
+                4688: "evt_process", 4697: "evt_service", 1102: "evt_clear", 6005: "evt_system", 6006: "evt_system",
+                6008: "evt_system", 6009: "evt_system", 1074: "evt_system", 1000: "evt_app", 1001: "evt_app", 1002: "evt_app",
+                **{k: "evt_account" for k in (4720, 4722, 4723, 4724, 4725, 4726, 4728, 4732, 4733, 4756)}}
+_LEGACY_LOG = {"secevent.evt": "security", "sysevent.evt": "system", "appevent.evt": "application"}
+
 RX_EID = re.compile(r'"EventID":\s*(?:\{"#attributes":\{[^}]*\},"#text":\s*)?(\d+)')
 RX_CHANNEL = re.compile(r'"Channel":\s*"([^"]*)"')
 
@@ -367,13 +424,19 @@ class EventLogModule(ArtifactModule):
             ctx.coverage("Event logs", "winevt\\Logs", "error", 0, "evtx parser not available")
             return
         files = sorted(ctx.glob("C:/Windows/System32/winevt/Logs/*.evtx"), key=lambda p: p.name.lower())
-        if not files:
+        legacy = {}
+        for pat in ("C:/Windows/System32/config/*.[Ee][Vv][Tt]", "C:/WINNT/system32/config/*.[Ee][Vv][Tt]"):
+            for p in ctx.glob(pat):
+                legacy.setdefault(p.name.lower(), p)
+        if not files and not legacy:
             ctx.coverage("Event logs", "C:\\Windows\\System32\\winevt\\Logs", "absent", 0)
             return
         total = sum(_size(p) for p in files) or 1
         done = 0
         self.ps_blocks: dict[str, dict] = {}
         self.channels_seen: set[str] = set()
+        if legacy:
+            self._legacy_logs(ctx, [legacy[k] for k in sorted(legacy)])
         dump_all = ctx.options.get("export_all_events", True)
         from ..core.exporter import CsvOut, safe_name
 
@@ -469,6 +532,70 @@ class EventLogModule(ArtifactModule):
                          "" if have or n else "none of the source logs exist on this system")
         ctx.coverage("USB / device events", "Partition, Kernel-PnP, DriverFrameworks, Storsvc, Ntfs, VHDMP, Security 6416",
                      "found" if ctx.counts.get("usb_event") else "not_found", ctx.counts.get("usb_event", 0))
+
+    def _legacy_logs(self, ctx, files) -> None:
+        """Windows 2000 / XP / 2003 event logs (.evt): every record to the all-records export, mapped events to artifacts."""
+        import io
+
+        from dissect.eventlog.evt import Evt
+
+        from ..core.exporter import CsvOut, safe_name
+
+        types = {1: "Error", 2: "Warning", 4: "Information", 8: "Audit Success", 16: "Audit Failure"}
+        for p in files:
+            log = _LEGACY_LOG.get(p.name.lower(), p.name.rsplit(".", 1)[0].lower())
+            stats = {"records": 0, "kept": 0, "first": None, "last": None}
+            dump = None
+            try:
+                with p.open("rb") as fh:
+                    raw = fh.read()
+                for r in Evt(io.BytesIO(raw)):
+                    stats["records"] += 1
+                    ts = r.TimeGenerated
+                    stats["first"] = min(stats["first"] or ts, ts)
+                    stats["last"] = max(stats["last"] or ts, ts)
+                    strings = [str(s) for s in (r.Strings or [])]
+                    if dump is None and ctx.options.get("export_all_events", True):
+                        dump = CsvOut(os.path.join(ctx.parsed_dir("Event Logs - all records"), safe_name(p.name.rsplit(".", 1)[0]) + ".csv"),
+                                      ["TimeCreatedUTC", "RecordId", "EventId", "Level", "Provider", "Channel", "Computer", "UserSid",
+                                       "Payload"])
+                    if dump is not None:
+                        dump.row([db_ts(ts)[:19], r.RecordNumber, r.EventCode, types.get(r.EventType, r.EventType), r.SourceName,
+                                  log.title(), r.Computername, r.UserSid or "",
+                                  " | ".join(f"String{i + 1}: {s}" for i, s in enumerate(strings) if s not in ("", "-"))[:30000]])
+                    spec = LEGACY.get((log, r.EventCode))
+                    if not spec or (log == "security" and r.SourceName != "Security"):
+                        continue
+                    modern, desc, names = spec
+                    if modern in (1000, 1001, 1002) and r.SourceName not in ("Application Error", "Application Hang", "DrWatson"):
+                        continue
+                    d = dict(zip(names, strings)) if names else {f"Data{i}": v for i, v in enumerate(strings)}
+                    if modern == 4625:
+                        d["Status"] = _FAIL_REASON.get(r.EventCode, "")
+                    typ = _LEGACY_TYPE[modern]
+                    base = {"event_id": r.EventCode, "equivalent_id": modern, "description": desc, "channel": log.title(),
+                            "provider": r.SourceName, "record_id": r.RecordNumber, "computer": r.Computername,
+                            "user_sid": r.UserSid}
+                    rec = getattr(self, f"_h_{typ}")(modern, d, base, r.SourceName)
+                    if rec is False:
+                        continue
+                    out = {**base, **(rec or {}), "event_data": {k: str(v)[:4000] for k, v in d.items()}}
+                    summary = out.pop("_summary", None) or f"{r.EventCode} {desc}"
+                    tags = out.pop("_tags", None)
+                    ctx.emit(typ, ts, out, summary=summary, user=out.get("user") or out.get("target_user") or None,
+                             source=f"{p.name} (record {r.RecordNumber})", ts_label="Event time", tags=tags)
+                    stats["kept"] += 1
+            except Exception as e:
+                ctx.warn(f"EVT {p.name}: {e}")
+                ctx.coverage("Event log (legacy .evt)", str(p).replace("/", "\\"), "error", stats["kept"], str(e)[:200])
+            if dump is not None:
+                dump.close()
+            if stats["records"]:
+                self.channels_seen.add(log)
+            ctx.emit("evtx_log", stats["last"], {
+                "file": p.name, "channel": f"{log.title()} (Windows 2000 / XP / 2003 .evt)", "records": stats["records"],
+                "kept": stats["kept"], "first_event": db_ts(stats["first"]), "last_event": db_ts(stats["last"]), "size": _size(p),
+            }, summary=f"{p.name}: {stats['records']:,} records", source=str(p), ts_label="Last event")
 
     @staticmethod
     def _dump_row(dump, ev, ts, record_id, eid):
@@ -663,6 +790,9 @@ class EventLogModule(ArtifactModule):
         if eid == 4097 and "screenconnect" not in provider.lower():
             return False
         if eid == 1116:
+            return False
+        # 1000 / 1001 / 1002 are crash / WER / hang only from these providers (LoadPerf and others reuse the numbers)
+        if eid in (1000, 1001, 1002) and provider not in ("Application Error", "Windows Error Reporting", "Application Hang"):
             return False
         vals = [str(v) for v in d.values() if v not in (None, "", "-")]
         app = g(d, "Data0", "AppName", "ProductName")

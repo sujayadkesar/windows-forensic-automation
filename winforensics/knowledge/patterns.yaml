@@ -20,9 +20,16 @@ commands:
     title: Execution policy bypass
     mitre: [T1059.001]
   - id: ps_download_cradle
+    # retrieval on its own is routine (API calls, admin scripts); it scores high only together with execution (IEX),
+    # an IP-address URL, an executable payload, a hidden window, encoding, ...
     regex: '(?:downloadstring|downloadfile|downloaddata|net\.webclient|invoke-webrequest|\biwr\b|invoke-restmethod|\birm\b|start-bitstransfer|wget\s+http|curl(?:\.exe)?\s+[-\w\s]*https?://)'
-    score: 7
+    score: 4
     title: Download cradle / remote content retrieval
+    mitre: [T1105]
+  - id: download_executable
+    regex: 'https?://[^\s"'']+?\.(?:exe|dll|scr|ps1|psm1|bat|cmd|vbs|vbe|js|jse|hta|msi|lnk|cpl)(?=$|[\s"''?#)])|-outfile\s+["'']?[^\s"'']+\.(?:exe|dll|scr|ps1|bat|cmd|vbs|hta|msi)\b'
+    score: 3
+    title: Executable or script downloaded
     mitre: [T1105]
   - id: ps_iex
     regex: '(?:\biex\b|invoke-expression|\.invoke\(\)|\[scriptblock\]::create)'
@@ -140,7 +147,7 @@ commands:
     title: Service creation
     mitre: [T1543.003]
   - id: run_key_add
-    regex: 'reg(?:\.exe)?\s+add\s+[^\n]*\\currentversion\\run|new-itemproperty[^\n]*\\currentversion\\run'
+    regex: 'reg(?:\.exe)?\s+add\s+[^\n]*\\currentversion\\run|(?:new|set)-itemproperty[^\n]*\\currentversion\\run'
     score: 7
     title: Run key persistence via command line
     mitre: [T1547.001]

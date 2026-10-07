@@ -113,6 +113,15 @@ def cmd_new(args):
 def cmd_run(args):
     from .core.engine import Engine
 
+    if getattr(args, "profile", None):
+        # every profile parses all artifact modules, so a processed case can be re-analyzed as another case type
+        from .core.case import Case
+        from .profiles import get_profile
+
+        case = Case.open(args.case)
+        case.info.profile = get_profile(args.profile).id
+        case.save()
+        case.close()
     listener = ConsoleListener(quiet=getattr(args, "quiet", False))
     eng = Engine(args.case, listener=listener)
     phases = tuple(args.phases.split(",")) if getattr(args, "phases", None) else ("evidence", "analysis", "report")
@@ -161,6 +170,9 @@ def cmd_rerun_module(args):
                     db.conn.execute(f"DELETE FROM artifacts WHERE evidence_id=? AND type IN ({','.join('?' * len(types))})",
                                     (ev["id"], *types))
                 db.conn.execute("DELETE FROM coverage WHERE evidence_id=? AND module=?", (ev["id"], mid))
+                if mid == "filesystem":  # the file system index and journal tables are rebuilt by the module
+                    db.conn.execute("DELETE FROM fs_entries WHERE evidence_id=?", (ev["id"],))
+                    db.conn.execute("DELETE FROM usn WHERE evidence_id=?", (ev["id"],))
             ctx.module_id = mid
             t = time.time()
             inst = cls()
@@ -227,6 +239,7 @@ def main(argv=None):
     r.add_argument("--case", required=True)
     r.add_argument("--phases")
     r.add_argument("--no-report", action="store_true")
+    r.add_argument("--profile", help="switch the case to another profile first (use with --phases analysis,report)")
     r.add_argument("--quiet", action="store_true")
     rp = sub.add_parser("report", help="(re)build the report")
     rp.add_argument("--case", required=True)
